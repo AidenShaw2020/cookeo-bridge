@@ -221,17 +221,28 @@ def visibility(cloud,identifier,privacy):
 
 def delete(cloud,identifier):
     from .cloud import CloudError
+    def soft_deleted(current):
+        if current.get('status')!='DELETED':return False
+        # The lite author API retains a tombstone. The mobile recipe endpoint
+        # must also report 404 before local ownership bindings can be removed.
+        try:cloud.recipe(identifier)
+        except CloudError as error:
+            if str(error)=='SEB HTTP 404':return True
+            raise
+        raise CloudError('Cloud nepotvrdil odstranění receptu. Místní kopie zůstává zachovaná.')
     try:current=read(cloud,identifier)
     except CloudError as error:
         if str(error)=='SEB HTTP 404':return
         raise
+    if soft_deleted(current):return
     # Exact Android contract: ld0/d.java b(variantId, status).
     route='/common-api/v3/recipes/PRO/'+urllib.parse.quote(recipe_reference(identifier),safe='')+'/?'+urllib.parse.urlencode({'format':'mobile','status':current.get('status','PERSONAL')})
     try:cloud.request(route,method='DELETE')
     except CloudError as error:
         if str(error)!='SEB HTTP 404':raise CloudError('Cloud odmítl odstranění receptu. Místní kopie zůstává zachovaná. ('+str(error)+')') from None
-    try:read(cloud,identifier)
+    try:current=read(cloud,identifier)
     except CloudError as error:
         if str(error)=='SEB HTTP 404':return
         raise
+    if soft_deleted(current):return
     raise CloudError('Cloud nepotvrdil odstranění receptu. Místní kopie zůstává zachovaná.')

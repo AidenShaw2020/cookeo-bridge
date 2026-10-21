@@ -3,7 +3,7 @@ import sys
 import tempfile
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import patch,Mock
 import unittest
 from aiohttp.test_utils import TestClient,TestServer
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'cookeo'))
@@ -94,6 +94,21 @@ class LifecycleTests(unittest.TestCase):
             ugc.delete(self.cloud,'OWN_ROOT')
         with patch.object(ugc,'read',return_value={'title':'Still there'}):
             with self.assertRaises(CloudError):ugc.delete(self.cloud,'OWN_ROOT')
+    def test_soft_delete_requires_mobile_404_and_sends_one_delete(self):
+        self.cloud.request=Mock();self.cloud.recipe=Mock(side_effect=CloudError('SEB HTTP 404'))
+        with patch.object(ugc,'read',side_effect=[{'status':'PERSONAL'},{'status':'DELETED'}]):
+            ugc.delete(self.cloud,'OWN_PERSONAL')
+        self.cloud.request.assert_called_once()
+        self.assertEqual(self.cloud.request.call_args.kwargs['method'],'DELETE')
+    def test_existing_tombstone_is_idempotent_without_another_delete(self):
+        self.cloud.request=Mock();self.cloud.recipe=Mock(side_effect=CloudError('SEB HTTP 404'))
+        with patch.object(ugc,'read',return_value={'status':'DELETED'}):ugc.delete(self.cloud,'OWN_PERSONAL')
+        self.cloud.request.assert_not_called()
+    def test_tombstone_with_readable_mobile_recipe_is_not_success(self):
+        self.cloud.request=Mock();self.cloud.recipe=Mock(return_value={'title':'Still readable'})
+        with patch.object(ugc,'read',return_value={'status':'DELETED'}):
+            with self.assertRaises(CloudError):ugc.delete(self.cloud,'OWN_PERSONAL')
+        self.cloud.request.assert_not_called()
 
 class LifecycleHTTPTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):

@@ -53,6 +53,8 @@ Autora určuje přihlášený účet; přezdívka je v horní liště. Poznámky
 
 **Odebrání z kuchařky je jiná operace než smazání autorského receptu.** Odebrání katalogového receptu ruší pouze jeho zařazení, původní recept zůstává. Smazání kuchařky odstraní kolekci, nikoli původní recepty. Obě operace prošly živým testem v BE/nl. Verze 0.3.1 opravuje odebírání tím, že převádí ID varianty ze seznamu na ID hlavního receptu.
 
+Smazání osobní kopie `PERSONAL` je živě ověřené v BE/nl. Cloud zachová evidenční záznam `DELETED`, ale rozhraní mobilní aplikace vrací 404 a recept zmizí z osobního seznamu. Verze 0.3.2 tento výsledek správně rozpoznává a při opakování neposílá další DELETE. Místní recept i katalogový základ zůstaly zachované. Jde o logické smazání u výrobce, nikoli důkaz fyzického vymazání jeho dat.
+
 Samostatné smazání našeho soukromého autorského záznamu přes DELETE zatím vrátilo 403. Nejde o obecné omezení účtu pro správu kuchařek. Při odmítnutém smazání propojeného receptu se místní obsah a vazby zachovají pro další pokus.
 
 Přijetí příkazu cloudem a potvrzení načtení hrncem jsou dvě různé věci. Když automatické potvrzení nepřijde, ověř displej; další pokus se automaticky neposílá.

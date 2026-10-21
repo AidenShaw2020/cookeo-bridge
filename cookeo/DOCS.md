@@ -68,6 +68,8 @@ The author comes from the signed-in account. Notes remain local. Private adaptat
 
 **Cookbooks and recipe deletion are different operations.** Removing a catalog recipe from a cookbook only removes that membership; the catalog original remains. Cookbook deletion removes the collection, not its source recipes. Both operations were verified in the BE/nl profile. Version 0.3.1 resolves the variant identifier returned by cookbook search to its top recipe identifier before removal.
 
+Deletion of a private `PERSONAL` adaptation was verified live in BE/nl. The cloud retains a lite `DELETED` record while the mobile endpoint returns 404 and the personal list no longer contains it. Version 0.3.2 recognizes that result and does not send another DELETE on retry. The local recipe and original catalog source were preserved. This is a provider soft deletion, not proof of physical erasure from its storage.
+
 Deleting an owned authored source is a separate operation. The Android recipe DELETE request returned HTTP 403 for our private author test record; this does not imply a general account restriction on cookbook management. The UI verifies deletion and never reports a refusal as success. Deleting a linked local recipe requires removal of its owned cloud copies, so failure preserves the local content and bindings. Unlinked local recipes can be deleted normally.
 
 Local export/import transfers content, not ownership bindings to existing cloud copies.

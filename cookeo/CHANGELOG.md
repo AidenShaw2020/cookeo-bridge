@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.2 — 2026-10-21
+
+- Recognize confirmed PERSONAL soft deletion: the lite API retains a DELETED record while the mobile endpoint returns 404. Both conditions are required before removing local ownership bindings.
+- Avoid a duplicate DELETE when retrying an already deleted copy. A readable mobile recipe still fails closed.
+- Verified one BE/nl personal-copy deletion: absent from the personal list, local recipe and published catalog source preserved. Authored-source deletion remains a separate, previously refused operation.
+
 ## 0.3.1 — 2026-10-21
 
 - Separate native PERSONAL adaptation creation from explicit author publication. New personal saves require a compatible published catalog base; cancelling its selector makes no cloud write. A live BE/nl test verified PRIVATE + PERSONAL content, the unchanged catalog source and personal-list indexing with status PERSONAL; official mobile UI display remains unconfirmed.
