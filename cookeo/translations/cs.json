@@ -1,0 +1,40 @@
+{
+  "configuration": {
+    "ui_language": {
+      "name": "Jazyk doplňku",
+      "description": "Čeština nebo angličtina; nezávisí na jazyku účtu výrobce."
+    },
+    "brand": {
+      "name": "Aplikace výrobce",
+      "description": "Značka, pod kterou je hrnec registrovaný."
+    },
+    "country": {
+      "name": "Země účtu",
+      "description": "Dvoupísmenný kód trhu výrobce. Zachovej region současného párování."
+    },
+    "language": {
+      "name": "Jazyk účtu",
+      "description": "Dvoupísmenný kód jazyka účtu. Firmware ani menu hrnce nemění."
+    },
+    "mqtt_host": {
+      "name": "MQTT broker",
+      "description": "Prázdné pole převezme MQTT službu Home Assistant."
+    },
+    "mqtt_port": {
+      "name": "MQTT port",
+      "description": "Obvykle 1883; pro TLS často 8883."
+    },
+    "mqtt_username": {
+      "name": "Uživatel MQTT",
+      "description": "Přihlašovací jméno k místnímu brokeru."
+    },
+    "mqtt_password": {
+      "name": "Heslo MQTT",
+      "description": "Heslo k brokeru, nikoli k účtu výrobce."
+    },
+    "mqtt_tls": {
+      "name": "TLS pro MQTT",
+      "description": "Zapni, pokud broker podporuje šifrované připojení."
+    }
+  }
+}

@@ -1,0 +1,8 @@
+name: cookeo-bridge
+services:
+  cookeo:
+    build: ./cookeo
+    command: ["python", "-m", "app.server", "--data", "/data", "--bind", "0.0.0.0", "--port", "8099", "--allow-host", "127.0.0.1", "--allow-host", "localhost"]
+    ports: ["127.0.0.1:8098:8099"]
+    volumes: ["./.stack-data:/data"]
+    restart: unless-stopped

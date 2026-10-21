@@ -1,0 +1,41 @@
+name: Cookeo Bridge
+version: "0.3.0"
+slug: cookeo_bridge
+description: Private Cookeo recipes, regional account setup, pairing and Home Assistant MQTT entities.
+arch: [amd64, aarch64]
+init: false
+startup: application
+boot: auto
+stage: experimental
+url: https://github.com/AidenShaw2020/cookeo-bridge
+backup: cold
+ingress: true
+ingress_port: 8099
+panel_title: Cookeo
+panel_icon: mdi:chef-hat
+panel_admin: true
+host_dbus: true
+services: ["mqtt:want"]
+homeassistant_api: true
+hassio_api: true
+hassio_role: default
+options:
+  ui_language: en
+  brand: moulinex
+  country: BE
+  language: nl
+  mqtt_host: ""
+  mqtt_port: 1883
+  mqtt_username: ""
+  mqtt_password: ""
+  mqtt_tls: false
+schema:
+  ui_language: list(en|cs)
+  brand: list(moulinex|tefal)
+  country: match(^[A-Z]{2}$)
+  language: match(^[a-z]{2}$)
+  mqtt_host: str?
+  mqtt_port: port
+  mqtt_username: str?
+  mqtt_password: password?
+  mqtt_tls: bool

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" fill="none">
+  <style>@media(prefers-color-scheme:dark){.handles,.feet{stroke:#d6d6d6}.lid-outline{stroke:#a6a6a6;stroke-width:1.5}}</style>
+  <ellipse cx="40" cy="71" rx="25" ry="4" fill="#171717" opacity=".12"/>
+  <path class="handles" d="M21 25c-4-1-9 2-9 7v12c0 4 4 7 8 5M59 25c4-1 9 2 9 7v12c0 4-4 7-8 5" stroke="#222" stroke-width="5" stroke-linecap="round"/>
+  <path d="M18 23h44v27c0 13-8 21-22 21s-22-8-22-21V23Z" fill="#FAFAFA" stroke="#222" stroke-width="2.5"/>
+  <path class="lid-outline" d="M17 24c0-9 9-15 23-15s23 6 23 15H17Z" fill="#252525"/>
+  <path d="M27 13c2-5 6-7 13-7s11 2 13 7" stroke="#252525" stroke-width="4" stroke-linecap="round"/>
+  <path d="M18 26h44" stroke="#E22B35" stroke-width="3"/>
+  <rect x="27" y="32" width="26" height="18" rx="4" fill="#202020"/>
+  <path d="M35 39c3-3 7-3 10 0m-8 3c2-2 4-2 6 0" stroke="#FFF" stroke-width="1.8" stroke-linecap="round"/>
+  <circle cx="40" cy="45" r="1" fill="#E22B35"/>
+  <circle cx="40" cy="59" r="6" fill="#EEE" stroke="#A5A5A5" stroke-width="1.5"/>
+  <path d="M40 55v3" stroke="#E22B35" stroke-width="2" stroke-linecap="round"/>
+  <path class="feet" d="M25 66l-2 5m32-5 2 5" stroke="#222" stroke-width="3" stroke-linecap="round"/>
+</svg>

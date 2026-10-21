@@ -1,0 +1,5 @@
+default_config:
+homeassistant:
+  name: Cookeo Test Lab
+  time_zone: Europe/Prague
+  unit_system: metric

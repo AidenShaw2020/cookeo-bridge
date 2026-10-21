@@ -1,0 +1,20 @@
+name: cookeo-lab
+services:
+  mqtt:
+    image: eclipse-mosquitto:2
+    ports:
+      - "127.0.0.1:18884:1883"
+    volumes:
+      - ./dev-mqtt/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    restart: unless-stopped
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    ports:
+      - "127.0.0.1:18123:8123"
+    volumes:
+      - ./.ha-data:/config
+      - ./dev-ha/configuration.yaml:/config/configuration.yaml:ro
+    environment:
+      TZ: Europe/Prague
+    depends_on: [mqtt]
+    restart: unless-stopped

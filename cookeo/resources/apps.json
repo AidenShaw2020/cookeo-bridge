@@ -1,0 +1,12 @@
+{
+  "tefal": {
+    "api_key": "d8f3706f1d5c65ac2a44c9b8ab4ad67e",
+    "domain": "PRO_TEF",
+    "ugc_api_key": "a633614088be92f4b270c76625cd1dc4"
+  },
+  "moulinex": {
+    "api_key": "tLQ6PasWAb4didcWJT6ufYybl4IJh54p",
+    "domain": "PRO_MOU",
+    "ugc_api_key": "12d7daa7ffd8825b6d1118c5bf8ca6b5"
+  }
+}

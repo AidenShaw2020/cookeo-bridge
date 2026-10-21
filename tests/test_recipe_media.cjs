@@ -1,0 +1,15 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
+const context={window:{}};
+vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../cookeo/app/web/recipe-media.js'),'utf8'),context);
+const photo=context.window.recipeMedia.photoURL;
+const full='https://images.example/original/food.jpg',thumb='https://images.example/thumb/food.jpg';
+const media={type:'PHOTO',original:full,thumbnail:thumb};
+assert.equal(photo({cover:{media}}),full,'Cards and detail use the original, not an enlarged thumbnail');
+assert.equal(photo({resourceMedias:[{isCover:true,media}]}),full,'Mobile detail uses resourceMedias.isCover');
+assert.equal(photo({creator:{media},resourceMedias:[{media}]}),'','Never use an avatar or an unmarked resource');
+assert.equal(photo({cover:{media:{...media,isDisabled:true}}}),'');
+assert.equal(photo({cover:{media:{...media,type:'VIDEO'}}}),'');
+assert.equal(photo({cover:{media:{type:'PHOTO',original:'javascript:alert(1)',thumbnail:thumb}}}),thumb);
+assert.equal(photo({photo:'data:image/jpeg;base64,AA=='}),'data:image/jpeg;base64,AA==');
+assert.equal(photo({photo:'data:image/svg+xml;base64,AA=='}),'');
+console.log('Recipe media: 8 checks passed.');

@@ -1,0 +1,40 @@
+{
+  "configuration": {
+    "ui_language": {
+      "name": "Interface language",
+      "description": "English or Czech. Separate from the manufacturer account language."
+    },
+    "brand": {
+      "name": "Manufacturer app",
+      "description": "Use the brand where the cooker is registered."
+    },
+    "country": {
+      "name": "Account country",
+      "description": "Two-letter manufacturer market code. Keep the existing pairing region."
+    },
+    "language": {
+      "name": "Account language",
+      "description": "Two-letter manufacturer account language. Does not change the cooker firmware."
+    },
+    "mqtt_host": {
+      "name": "MQTT broker",
+      "description": "Leave empty to discover the Home Assistant MQTT service."
+    },
+    "mqtt_port": {
+      "name": "MQTT port",
+      "description": "Broker port, normally 1883 or 8883 for TLS."
+    },
+    "mqtt_username": {
+      "name": "MQTT username",
+      "description": "Local broker username, if needed."
+    },
+    "mqtt_password": {
+      "name": "MQTT password",
+      "description": "Local broker password. Not the manufacturer account password."
+    },
+    "mqtt_tls": {
+      "name": "MQTT TLS",
+      "description": "Enable TLS when the broker supports it."
+    }
+  }
+}

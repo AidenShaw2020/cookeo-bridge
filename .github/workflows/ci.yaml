@@ -1,0 +1,31 @@
+name: Checks
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - run: pip install -r cookeo/requirements.txt PyYAML
+      - run: python -m unittest discover -s tests -p 'test_*.py'
+      - run: node tests/test_recipe_detail.cjs && node tests/test_recipe_media.cjs
+      - run: python tools/check_package.py
+      - name: Build and smoke-test standalone demo
+        shell: bash
+        run: |
+          docker build -t cookeo-ci cookeo
+          docker run -d --name cookeo-ci -p 127.0.0.1:18099:8099 cookeo-ci python -m app.server --data /data --demo --bind 0.0.0.0 --port 8099
+          trap 'docker rm -f cookeo-ci' EXIT
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:18099/health; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:18099/health
+          curl -fsS http://127.0.0.1:18099/ | grep -q 'Cookeo'
