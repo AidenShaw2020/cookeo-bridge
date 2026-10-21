@@ -22,7 +22,7 @@ The cooker continues to use the manufacturer's cloud. No firmware change, DNS re
 - Automatic discovery of cookers already linked to the selected cloud profile.
 - Recipe search across languages, pagination, photos, authors, ratings, reviews and personal local notes.
 - Local recipe editor with ingredients, per-step ingredient selection, cooking programs, durations, optional temperature and stirring speed.
-- Private-by-default cloud recipes, visibility controls, owned-copy tracking, editing, read-back validation and transfer through a private `PERSONAL` adaptation.
+- Personal recipe adaptations with an explicit catalog source, read-back validation and ownership tracking; separate public author submission with a food photograph and moderation status.
 - Online cookbooks: create, rename, delete and add/remove recipes.
 - Home Assistant MQTT discovery: cooking status, mode, program, recipe, step, remaining/elapsed time, progress, target temperature, firmware, errors and connectivity when reported by the device.
 - Optional one-attempt Bluetooth provisioning for the verified CE9821F0. HA Bluetooth/proxy advertisement discovery helps find the device address; provisioning currently requires Bluetooth local to the app host.
@@ -43,19 +43,23 @@ The cooker continues to use the manufacturer's cloud. No firmware change, DNS re
 | Action | Result |
 | --- | --- |
 | Save | Saves only the local library entry. |
-| Save to cloud | Saves the current recipe using the selected visibility, private by default. |
+| Save to cloud | Creates or updates a private `PERSONAL` adaptation. For a new copy, explicitly choose a compatible published recipe as its base. Cancelling the selector creates no cloud record. |
 | Assign online cookbook | Opens a cookbook selector for an existing cloud copy. Opening/cancelling does not upload or publish anything. |
-| Send to cooker | Verifies and loads the current saved cloud copy on an idle cooker. Does not save unpublished local edits or start cooking. |
+| Send to cooker | Verifies and loads the current saved personal copy on an idle cooker. Does not upload local edits or start cooking. |
 
-Badges show local-only, cloud/private, cloud/public and unsaved content changes. Opening a recipe verifies its cloud status. The author is taken from the signed-in account; its nickname appears in the top bar.
+**Personal saving and public submission use different API workflows.** The manufacturer's author form requests a complete recipe and photograph and does not offer a private/public choice. Its creation endpoint ignored a requested `PRIVATE` status in our live test. An earlier authored source with private access entered moderation and became `TO_BE_CORRECTED`; anonymous 404 proved restricted access, not absence of moderation.
 
-For a new recipe, visibility is a draft choice until **Save to cloud**. For an already uploaded recipe, changing **Private / Public** immediately updates its authored cloud source. The device-readable `PERSONAL` adaptation remains private. Public visibility is a publication request; catalog indexing and any moderation remain controlled by the manufacturer. No community publication was performed during release testing.
+The revised private path creates only a native `PERSONAL` adaptation of a published catalog recipe in the account's market/language. It does not create or update an authored source, copy an unrelated dish photograph or modify the catalog original. A base already linked to another local personal recipe is rejected. A lost creation response is retained for inspection rather than automatically creating another copy. **A live BE/nl test created one PRIVATE + PERSONAL copy, verified its ingredients/steps and found it in the personal-recipe search using status PERSONAL. The published source stayed unchanged and no authored record was created. Appearance in the official mobile UI has not been confirmed.**
 
-Private copies are checked using authenticated read-back and an anonymous read expected to return 404. Contents and cooker parameters are checked before transfer. Editing an imported online recipe never overwrites its original.
+Choosing **Public** for an uploaded recipe explicitly submits an author version with your own food photograph. The personal device copy remains private. The badge distinguishes submission/pending approval, correction and approved publication; submitting does not mean the recipe is immediately listed for everyone. The photo upload/publication payload is covered by mocked tests and has not been submitted live as part of this fix. Choosing **Private** requests private access for the owned author version; it does not erase previous moderation history.
 
-**Cloud deletion limitation:** the exact recipe DELETE route in the supplied Android APK returned HTTP 403 for our private author test record. The UI provides a deletion attempt and verifies removal; it never reports a refused deletion as success. Deleting a linked local recipe requires successful deletion of its owned cloud copies, so a refusal preserves the local recipe and links for retry. Cloud-only deletion preserves local content. Unlinked local entries can be deleted normally. Do not assume deletion permissions are available in every profile.
+The author comes from the signed-in account. Notes remain local. Private adaptations currently do not upload their local photograph. Importing a recipe does not grant ownership of its catalog source. Export/import transfers content, not existing cloud ownership bindings: choose an unused base for a new personal copy rather than replacing an adaptation created in another installation.
 
-Photos and personal notes currently remain local. Local export/import transfers content, not ownership bindings to existing cloud copies.
+**Cookbooks and recipe deletion are different operations.** Removing a catalog recipe from a cookbook only removes that membership; the catalog original remains. Cookbook deletion removes the collection, not its source recipes. Both operations were verified in the BE/nl profile. Version 0.3.1 resolves the variant identifier returned by cookbook search to its top recipe identifier before removal.
+
+Deleting an owned authored source is a separate operation. The Android recipe DELETE request returned HTTP 403 for our private author test record; this does not imply a general account restriction on cookbook management. The UI verifies deletion and never reports a refusal as success. Deleting a linked local recipe requires removal of its owned cloud copies, so failure preserves the local content and bindings. Unlinked local recipes can be deleted normally.
+
+Local export/import transfers content, not ownership bindings to existing cloud copies.
 
 ## Run without Home Assistant
 

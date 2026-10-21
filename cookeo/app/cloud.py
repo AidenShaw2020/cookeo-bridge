@@ -23,13 +23,12 @@ APPS=json.loads((Path(__file__).resolve().parents[1]/'resources/apps.json').read
 class CloudError(RuntimeError):pass
 
 
-def http(url,*,method='GET',headers=None,body=None,form=None):
+def http(url,*,method='GET',headers=None,body=None,form=None,raw=None):
     headers=dict(headers or {})
     if form is not None:
         raw=urllib.parse.urlencode(form).encode();headers['Content-Type']='application/x-www-form-urlencoded'
     elif body is not None:
         raw=json.dumps(body).encode();headers['Content-Type']='application/json'
-    else:raw=None
     class NoRedirect(urllib.request.HTTPRedirectHandler):
         def redirect_request(self,*args,**kwargs):return None
     request=urllib.request.Request(url,raw,headers,method=method)
@@ -225,7 +224,12 @@ class Cloud:
             'fieldFilters':[{'field':'lang.key','values':[s['lang']]},{'field':'market.key','values':['GS_'+s['market']]}]})
         recipe=recipe_reference(value.get('recipe_id'))
         if action=='add':return self.request(base+'/PRO/'+identifier+'/recipes?'+query,'POST',{'topRecipeId':recipe})
-        if action=='remove':return self.request(base+'/PRO/'+identifier+'/recipes?'+query,'DELETE',{'topRecipeIds':[recipe]})
+        if action=='remove':
+            # A cookbook search returns a variant identifier. The delete body
+            # requires its top recipe, just like the add body (ge0/g in APK).
+            current=self.recipe(recipe)
+            top=recipe_reference((current.get('groupingId') or {}).get('functionalId'))
+            return self.request(base+'/PRO/'+identifier+'/recipes?'+query,'DELETE',{'topRecipeIds':[top]})
         raise ValueError('Neplatná operace s kuchařkou.')
 
     def device_code_url(self):

@@ -1,5 +1,8 @@
-"""MyRecipe model references and explicitly private recipe payloads."""
+"""Native personal adaptations and explicit author-publication requests."""
 import urllib.parse
+import base64
+import re
+import secrets
 from .cloud import APPS, http, recipe_reference
 from .recipes import normalize,FIELDS
 
@@ -88,7 +91,7 @@ def payload(cloud,recipe):
 
 
 def lite_payload(cloud,recipe):
-    """The mobile creation route defaults to PUBLIC; use the explicit lite schema."""
+    """Serialize the lite edit schema; creation privacy is not a workflow guard."""
     value=payload(cloud,recipe)
     for field in ('domain','recipeType','defaultApplianceGroup','partner'):
         value[field]=value[field]['key']
@@ -115,10 +118,6 @@ def lite_payload(cloud,recipe):
     return value
 
 
-def create(cloud,recipe):
-    return request(cloud,'/v3/recipes?format=lite&sourceSystemKey=PRO','POST',lite_payload(cloud,recipe))
-
-
 def read(cloud,identifier):
     return request(cloud,'/v3/recipes/PRO/'+urllib.parse.quote(recipe_reference(identifier),safe='')+'?format=lite')
 
@@ -143,10 +142,73 @@ def update(cloud,identifier,recipe):
 
 def create_personal(cloud,recipe,original):
     value=payload(cloud,recipe)
-    value.update(originalRecipe={'fid':original['fid']},privacyLevel={'key':'PRIVATE'})
-    if original.get('resourceMedias'):value['resourceMedias']=original['resourceMedias']
-    if original.get('cover'):value['cover']=original['cover']
+    value.pop('partner',None)
+    source=(original.get('originalRecipe') or {}).get('fid') or original['fid']
+    value.update(originalRecipe={'fid':source},privacyLevel={'key':'PRIVATE'},
+                 domain=original.get('domain') or value['domain'],market=original.get('market') or value['market'],lang=original.get('lang') or value['lang'])
+    # Importing an existing recipe can retain its own cover. A newly authored
+    # private recipe must not receive an unrelated source recipe's photograph.
+    if recipe.get('cloud_id')==original['fid']['functionalId']:
+        if original.get('resourceMedias'):value['resourceMedias']=original['resourceMedias']
+        if original.get('cover'):value['cover']=original['cover']
     return request(cloud,'/v3/recipes','POST',value)
+
+
+def personal_source(cloud,recipe):
+    """Use the app's adaptation flow, never create a private author draft."""
+    ref=recipe.get('personal_source_id') or recipe.get('cloud_id')
+    if not ref:raise ValueError('Vyber základ pro osobní kopii receptu, stejně jako v aplikaci výrobce.')
+    selection=cloud.selection();group=cloud.appliance_group()
+    original=cloud.recipe(ref)
+    if not any(g.get('key')==group for g in original.get('applianceGroups',[])):
+        raise ValueError('The original recipe is not compatible with this cooker.')
+    if original.get('market')!='GS_'+selection['market'] or original.get('lang')!=selection['lang']:
+        raise ValueError('Zvol základ ve stejné zemi a jazyce jako účet, aby osobní kopie byla dostupná v aplikaci.')
+    if original.get('status') not in ('PUBLISHED','VALIDATED_MARKET') or (original.get('privacyLevel') or {}).get('key') not in ('PUBLIC','COMMUNITY'):
+        raise ValueError('Jako základ zvol publikovaný katalogový recept, nikoli soukromý autorský záznam.')
+    return original
+
+
+def personal_sources(cloud,query='',page=0):
+    selection=cloud.selection();group=cloud.appliance_group()
+    if not isinstance(query,str) or len(query)>200 or type(page) is not int or not 0<=page<=10000:raise ValueError('Invalid recipe source search.')
+    params=urllib.parse.urlencode({'lang':selection['lang'],'market':'GS_'+selection['market'],
+            'page':page,'size':24,'q':query,'groupBy':'topRecipe','myUniverse':'false','myOwnRecipe':'false','withAutomaticSpellcheck':'false'})
+    body={'sort':{'name':'score' if query else 'creationDate','direction':'DESC'},'fieldList':['title','topRecipe.id','privacyLevel','resourceMedias','creator','isAdaptation'],
+            'fieldFilters':[{'field':'lang.key','values':[selection['lang']]},{'field':'market.key','values':['GS_'+selection['market']]},
+                {'field':'applianceGroups.reference.key','values':[group]},
+                {'field':'status.key','values':['PUBLISHED','VALIDATED_MARKET']},{'field':'privacyLevel.key','values':['PUBLIC','COMMUNITY']}],
+            'facetList':[],'facetFilters':[],'nestedFieldFiltersGroup':[],
+            'profileBasedFilters':{'filterApplianceGroup':False,'filterExcludedFoods':False,'filterKitchenwares':False},'ingredientSelected':[]}
+    return cloud.request('/common-api/v4/search/recipes?'+params,'POST',body)
+
+
+def publish_author(cloud,recipe,identifier=None):
+    """Explicit public submission, matching the app's publication screen."""
+    match=re.fullmatch(r'data:image/(jpeg|png|webp);base64,([A-Za-z0-9+/=]+)',recipe.get('photo',''))
+    if not match:raise ValueError('Pro veřejné zveřejnění přidej vlastní fotografii pokrmu do formuláře receptu.')
+    raw=base64.b64decode(match[2],validate=True)
+    if len(raw)>500000:raise ValueError('Recipe photo is too large.')
+    boundary='cookeo-'+secrets.token_hex(16)
+    multipart=(f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="recipe.{match[1]}"\r\nContent-Type: image/{match[1]}\r\n\r\n').encode()+raw+f'\r\n--{boundary}--\r\n'.encode()
+    context=cloud.context();tokens=cloud.tokens()
+    picture=http(API+'/statics/pictures/upload',method='POST',raw=multipart,headers={
+        'ApiKey':APPS[context['brand']]['ugc_api_key'],'DCP-Context':context['context'],
+        'Grant-Type':'RCUToken','Authorization':'Bearer '+tokens['access_token'],
+        'Content-Type':'multipart/form-data; boundary='+boundary,'Accept':'application/json'})
+    if not picture.get('key') or not picture.get('original'):raise ValueError('The manufacturer did not confirm the uploaded photo.')
+    media={'media':{k:picture[k] for k in ('key','type','original','thumbnail','originalFilename','creationDate','releaseDate','isDisabled','metadata') if k in picture},'isCover':True}
+    value=lite_payload(cloud,recipe);value.update(privacyLevel='PUBLIC',status='VALIDATED_PARTNER',resourceMedias=[media],cover=media)
+    if identifier:
+        current=read(cloud,identifier)
+        for field in ('ingredients','steps'):
+            for i,item in enumerate(value[field]):
+                old=current.get(field,[])
+                if i<len(old) and old[i].get('identifier'):item['identifier']=old[i]['identifier']
+        for step in value['steps']:step['ingredients']=[value['ingredients'][int(ref[2:])].get('identifier') or ref for ref in step['ingredients']]
+        value['identifier']={'functionalId':recipe_reference(identifier),'sourceSystem':'PRO'}
+        return request(cloud,'/v3/recipes/PRO/'+urllib.parse.quote(identifier,safe='')+'?format=lite','PUT',value)
+    return request(cloud,'/v3/recipes?format=lite&sourceSystemKey=PRO','POST',value)
 
 
 def visibility(cloud,identifier,privacy):

@@ -39,17 +39,21 @@ Při přechodu z PC nejdřív zastav starý vývojový proces, pak spusť dopln�
 ## Recepty a soukromí
 
 - **Uložit**: pouze místní knihovna.
-- **Uložit na cloud**: aktuální recept se zvolenou viditelností, výchozí je soukromý.
-- **Přiřadit online kuchařku**: otevře výběr pro již nahraný recept. Otevření ani zrušení výběru nic nenahrává a nepublikuje.
-- **Odeslat na hrnec**: ověří a odešle aktuální uloženou cloudovou verzi. Neuložené změny nejprve ulož na cloud. Vaření spustíš až na hrnci.
+- **Uložit na cloud**: vytvoří nebo aktualizuje osobní kopii `PERSONAL`. Při prvním uložení vybereš publikovaný základ ze stejné země a jazyka účtu. Zrušení výběru nic na cloudu nezaloží.
+- **Přiřadit online kuchařku**: výběr pro již nahraný recept; otevření ani zrušení nic nenahrává.
+- **Odeslat na hrnec**: ověří a odešle aktuální uloženou osobní kopii. Neuložené změny nejprve ulož na cloud. Vaření spustíš až na hrnci.
 
-Štítky rozlišují místní kopii, soukromý/veřejný cloudový recept a neuložené změny. Při otevření se stav ověřuje přes API. Autora automaticky určuje přihlášený účet; přezdívka se zobrazuje vpravo nahoře.
+**Osobní úprava a veřejný autorský recept mají odlišný postup.** Autorský formulář výrobce vyžaduje celý recept a fotografii a soukromou volbu nenabízí. Při živém testu jeho API ignorovalo požadovaný stav `PRIVATE`. Dřívější autorský záznam se soukromým přístupem skončil ve schvalování a ve stavu `TO_BE_CORRECTED`. Anonymní odpověď 404 tedy ověřila omezení přístupu, nikoli vynechání schvalování.
 
-U nového receptu je soukromý/veřejný volbou pro první nahrání. U již nahraného receptu přepnutí ihned změní viditelnost jeho autorského základu v cloudu. Osobní kopie `PERSONAL` pro hrnec zůstává soukromá. Veřejná viditelnost je požadavek na publikaci; indexaci a případné schvalování řídí výrobce. Při testování vydání nebyl žádný recept veřejně publikován.
+Opravené soukromé ukládání zakládá pouze nativní osobní úpravu `PERSONAL` vybraného publikovaného receptu. Nevytváří ani neaktualizuje autorský záznam a nepřebírá cizí fotografii pokrmu. Původní katalogový recept se nemění. Stejný základ nelze použít pro dvě místní osobní kopie; po ztrátě odpovědi se další kopie automaticky nezakládá. **Živý test BE/nl vytvořil jednu kopii PRIVATE + PERSONAL, ověřil suroviny i kroky a našel ji ve vyhledávání osobních receptů s filtrem PERSONAL. Katalogový základ zůstal zachovaný a nevznikl autorský záznam. Zobrazení v oficiální mobilní aplikaci zatím není potvrzené.**
 
-**Omezení mazání:** přesný požadavek DELETE doložený v APK vrátil u našeho soukromého autorského testu HTTP 403. Rozhraní umožňuje pokus o odstranění a výsledek ověřuje. Při odmítnutí nesmaže místní propojený recept ani jeho vazby, aby bylo možné operaci zopakovat. Mazání pouze z cloudu místní obsah ponechá. Místní recept bez propojené cloudové kopie lze smazat běžně.
+Přepnutí již nahraného receptu na **Veřejný** výslovně odešle autorskou verzi s vlastní fotografií výrobci ke schválení. Osobní kopie pro hrnec zůstává soukromá. Štítek odlišuje čekání na schválení, požadavek na opravu a schválené zveřejnění. Samotné odeslání neznamená okamžitou dostupnost všem. Nový požadavek s fotografií je ověřen testovací odpovědí, nikoli živým veřejným publikováním. Volba **Soukromý** žádá o soukromý přístup k vlastní autorské verzi; nemaže historii schvalování.
 
-V editoru lze zadat suroviny, jejich přiřazení ke krokům, programy, časy, teplotu a rychlost míchání podle možností modelu. Soukromé kopie se ověřují i anonymním čtením (očekává se 404), obsah se kontroluje zpětným načtením. Fotografie a poznámky zatím zůstávají místní. Úprava staženého receptu nepřepisuje původní online recept.
+Autora určuje přihlášený účet; přezdívka je v horní liště. Poznámky zůstávají místní. Osobní kopie nyní nenahrává místní fotografii. Import přenáší obsah, nikoli vlastnictví původního receptu nebo vazby na existující cloudové kopie. Pro novou osobní kopii zvol dosud neupravený základ, aby nenahradila úpravu z jiné instalace.
+
+**Odebrání z kuchařky je jiná operace než smazání autorského receptu.** Odebrání katalogového receptu ruší pouze jeho zařazení, původní recept zůstává. Smazání kuchařky odstraní kolekci, nikoli původní recepty. Obě operace prošly živým testem v BE/nl. Verze 0.3.1 opravuje odebírání tím, že převádí ID varianty ze seznamu na ID hlavního receptu.
+
+Samostatné smazání našeho soukromého autorského záznamu přes DELETE zatím vrátilo 403. Nejde o obecné omezení účtu pro správu kuchařek. Při odmítnutém smazání propojeného receptu se místní obsah a vazby zachovají pro další pokus.
 
 Přijetí příkazu cloudem a potvrzení načtení hrncem jsou dvě různé věci. Když automatické potvrzení nepřijde, ověř displej; další pokus se automaticky neposílá.
 

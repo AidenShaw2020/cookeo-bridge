@@ -65,6 +65,7 @@ def make_app(folder,*,ingress=False,demo=False,allowed_hosts=None):
             result={'cloud_connected':False,'mqtt_connected':False,'last_error':None,'devices':[]}
         return web.json_response({**result,'demo':demo,'logged_in':bool(store.get('tokens')),
             'account_name':cloud.cache.get('account_name','') if store.get('tokens') else '',
+            'new_cloud_recipes_enabled':True,'public_recipes_enabled':True,
             'selection':cloud.selection(),'pairing':pairing.public(),
             'recipe_count':len(store.all_recipes()),'recipe_transfer_supported':not demo,
             'ui_language':store.get('ui_language','en'),'ui_language':store.get('ui_language','en'),'ha_automatic':bool(os.environ.get('SUPERVISOR_TOKEN')),'configuration_error':store.get('configuration_error')})
@@ -140,7 +141,11 @@ def make_app(folder,*,ingress=False,demo=False,allowed_hosts=None):
                             recipe['author']=cloud.cache.get('account_name',recipe.get('author',''))
                             link=links.get(prefix+recipe['id'])
                             recipe['cloud_state']=({'uploaded':True,'privacy':link.get('privacy'),
-                                'current':bool(link.get('verified') and link.get('fingerprint')==fingerprint(recipe))} if link else {'uploaded':False})
+                                'publication_status':link.get('publication_status'),
+                                'publicly_published':link.get('privacy')=='PUBLIC' and link.get('publication_status') in ('PUBLISHED','VALIDATED_MARKET'),
+                                'personal_status':link.get('recipe_status'),
+                                'current':bool(link.get('verified') and link.get('fingerprint')==fingerprint(recipe))}
+                                if link and link.get('reference') else {'uploaded':False,'creation_pending':bool(link and link.get('creation_pending'))})
                 try:await asyncio.to_thread(cached_states)
                 except CloudError:pass  # The local library remains usable offline.
             return web.json_response({'format':'cookeo-library-v3','recipes':recipes})
@@ -188,6 +193,10 @@ def make_app(folder,*,ingress=False,demo=False,allowed_hosts=None):
         require_live()
         from .ugc import public_programs
         return web.json_response({'programs':await asyncio.to_thread(public_programs,cloud)})
+    async def own_sources(request):
+        require_live()
+        from .ugc import personal_sources
+        return web.json_response(await asyncio.to_thread(personal_sources,cloud,request.query.get('q',''),int(request.query.get('page','0'))))
     async def search(request):
         require_live();data=await asyncio.to_thread(cloud.search_recipes,request.query.get('q',''),int(request.query.get('page','0')),request.query.get('lang'))
         return web.json_response(data)
@@ -247,6 +256,7 @@ def make_app(folder,*,ingress=False,demo=False,allowed_hosts=None):
         ('DELETE','/api/library/{id}/cloud',own_recipe_cloud),('PUT','/api/library/{id}/visibility',own_visibility),
         ('POST','/api/library/{id}/send',own_recipe_send),
         ('GET','/api/own-recipes/programs',own_programs),
+        ('GET','/api/own-recipes/sources',own_sources),
         ('GET','/api/recipes/search',search),('GET','/api/recipes/{id}/comments',recipe_comments),
         ('GET','/api/recipes/{id}',cloud_recipe),('POST','/api/recipes/send',send_recipe),
         ('GET','/api/recipe-notes',recipe_note),('PUT','/api/recipe-notes',recipe_note),('POST','/api/recipes/review',review),

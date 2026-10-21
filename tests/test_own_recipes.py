@@ -31,15 +31,13 @@ class PrivateRecipeTests(unittest.TestCase):
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory();self.store=Store(self.tmp.name)
         self.cloud=SimpleNamespace(store=self.store,profile=lambda:{'rcu':{'rcuAccountId':'ACCOUNT_A'}},
-            selection=lambda:{'brand':'moulinex','market':'BE','lang':'nl'},context=lambda:{'context':'MOULINEX_BE'},
+            selection=lambda:{'brand':'moulinex','market':'BE','lang':'nl'},context=lambda:{'context':'MOULINEX_BE','brand':'moulinex'},
             appliance_group=lambda:'APPLIANCE_GROUP_3019')
     def tearDown(self):self.store.close();self.tmp.cleanup()
-    def test_create_uses_private_lite_contract_and_links_step_ingredients(self):
-        with patch.object(ugc,'programs',return_value=programs()),patch.object(ugc,'request',return_value={}) as request:
-            ugc.create(self.cloud,recipe())
-        _,route,method,body=request.call_args.args
-        self.assertEqual(route,'/v3/recipes?format=lite&sourceSystemKey=PRO')
-        self.assertEqual(method,'POST');self.assertEqual(body['privacyLevel'],'PRIVATE')
+    def test_lite_edit_schema_links_step_ingredients(self):
+        with patch.object(ugc,'programs',return_value=programs()):
+            body=ugc.lite_payload(self.cloud,recipe())
+        self.assertEqual(body['privacyLevel'],'PRIVATE')
         self.assertIsNone(body['ingredients'][0]['identifier'])
         self.assertEqual(body['steps'][1]['ingredients'],['##0'])
         op=body['steps'][1]['sequences'][0]['operations'][0]
@@ -48,7 +46,7 @@ class PrivateRecipeTests(unittest.TestCase):
     def test_program_constraints_reject_before_any_cloud_write(self):
         value=recipe();value['flow'][1]['duration_minutes']=100
         with patch.object(ugc,'programs',return_value=programs()),patch.object(ugc,'request') as request:
-            with self.assertRaises(ValueError):ugc.create(self.cloud,value)
+            with self.assertRaises(ValueError):ugc.create_personal(self.cloud,value,{'fid':{'functionalId':'PUBLIC_SOURCE','sourceSystem':'PRO'}})
         request.assert_not_called()
     def test_personal_copy_keeps_private_visibility_and_owned_original(self):
         source={'fid':{'functionalId':'OUR_PRIVATE_ROOT','sourceSystem':'PRO'}}
@@ -72,22 +70,44 @@ class PrivateRecipeTests(unittest.TestCase):
             with patch('app.own_recipes.http',side_effect=CloudError('SEB HTTP 404')) as http:
                 verify_private(self.cloud,'PRIVATE_TEST')
                 self.assertNotIn('Authorization',http.call_args.kwargs['headers'])
-    def test_client_cloud_id_is_never_used_to_overwrite_original(self):
+    def test_new_private_save_never_creates_an_author_record(self):
         local=self.store.put_recipe({**recipe(),'cloud_id':'SOMEONE_ELSES_RECIPE'})
-        with patch.object(ugc,'create',return_value={'identifier':{'functionalId':'NEW_PRIVATE'}}) as create,patch.object(ugc,'update') as update,patch('app.own_recipes.verify_private',side_effect=CloudError('verify failed')):
-            with self.assertRaises(CloudError):save_private(self.cloud,local)
-        create.assert_called_once();update.assert_not_called()
-        links=self.store.get('own_recipe_links');self.assertFalse(next(iter(links.values()))['verified'])
-    def test_first_save_returns_personal_copy_not_private_author_draft(self):
-        local=self.store.put_recipe({**recipe(),'cloud_id':'UNTRUSTED_ORIGINAL'})
-        root={'fid':{'functionalId':'OUR_ROOT'},'groupingId':{'functionalId':'ROOT_GROUP'},'privacyLevel':{'key':'PRIVATE'}}
-        personal={'fid':{'functionalId':'OUR_PERSONAL'},'groupingId':{'functionalId':'ROOT_GROUP'}}
-        self.cloud.recipe=lambda ref: root if ref=='OUR_ROOT' else personal
-        with patch.object(ugc,'create',return_value={'identifier':{'functionalId':'OUR_ROOT'}}),patch.object(ugc,'create_personal',return_value={'fid':{'functionalId':'OUR_PERSONAL'}}) as create_personal,patch('app.own_recipes.verify_private',return_value={'status':'PERSONAL'}),patch('app.own_recipes.verify_content'):
-            result=save_private(self.cloud,local)
-        self.assertEqual(result['reference'],'OUR_PERSONAL');self.assertEqual(result['root_reference'],'OUR_ROOT')
-        self.assertEqual(result['recipe_status'],'PERSONAL');self.assertEqual(result['privacy'],'PRIVATE')
-        self.assertIs(create_personal.call_args.args[2],root)
+        with patch.object(ugc,'personal_source',side_effect=ValueError('Choose source')),patch.object(ugc,'publish_author') as create,patch.object(ugc,'update') as update:
+            with self.assertRaises(ValueError):save_private(self.cloud,local)
+        create.assert_not_called();update.assert_not_called()
+        self.assertFalse(self.store.get('own_recipe_links',{}))
+    def test_source_must_be_published_compatible_and_in_account_locale(self):
+        valid={'fid':{'functionalId':'PUBLIC_SOURCE'},'market':'GS_BE','lang':'nl','status':'PUBLISHED',
+            'privacyLevel':{'key':'PUBLIC'},'applianceGroups':[{'key':'APPLIANCE_GROUP_3019'}]}
+        self.cloud.recipe=lambda ref:valid
+        self.assertIs(ugc.personal_source(self.cloud,{'personal_source_id':'PUBLIC_SOURCE'}),valid)
+        for changes in ({'market':'GS_CZ'},{'lang':'cs'},{'status':'TO_BE_CORRECTED'},
+                        {'privacyLevel':{'key':'PRIVATE'}},{'applianceGroups':[]}):
+            self.cloud.recipe=lambda ref,changes=changes:{**valid,**changes}
+            with self.subTest(changes=changes),self.assertRaises(ValueError):
+                ugc.personal_source(self.cloud,{'personal_source_id':'PUBLIC_SOURCE'})
+    def test_public_submission_requires_and_uploads_own_photo(self):
+        self.cloud.tokens=lambda:{'access_token':'TEST_TOKEN'}
+        media={'key':'PHOTO_KEY','original':'https://example.invalid/recipe.jpg','thumbnail':'https://example.invalid/small.jpg','type':'PICTURE'}
+        value={**recipe(),'photo':'data:image/jpeg;base64,/9j/2Q=='}
+        with patch.object(ugc,'programs',return_value=programs()),patch.object(ugc,'http',return_value=media) as upload,patch.object(ugc,'request',return_value={}) as request:
+            ugc.publish_author(self.cloud,value)
+        self.assertEqual(upload.call_args.args[0],ugc.API+'/statics/pictures/upload')
+        self.assertIn(b'name="file"',upload.call_args.kwargs['raw'])
+        self.assertTrue(upload.call_args.kwargs['headers']['Content-Type'].startswith('multipart/form-data; boundary='))
+        body=request.call_args.args[3]
+        self.assertEqual(body['privacyLevel'],'PUBLIC');self.assertEqual(body['status'],'VALIDATED_PARTNER')
+        self.assertEqual(body['cover']['media']['key'],'PHOTO_KEY')
+        self.assertEqual(body['resourceMedias'],[body['cover']])
+        with patch.object(ugc,'http') as upload,patch.object(ugc,'request') as request:
+            with self.assertRaises(ValueError):ugc.publish_author(self.cloud,recipe())
+        upload.assert_not_called();request.assert_not_called()
+    def test_author_only_link_is_not_resubmitted_to_moderation(self):
+        local=self.store.put_recipe(recipe());key=binding_key(self.cloud,local['id'])
+        self.store.set('own_recipe_links',{key:{'reference':'OUR_ROOT','verified':False}})
+        with patch('app.own_recipes.verify_private',return_value={'status':'TO_BE_CORRECTED'}),patch.object(ugc,'create_personal') as personal,patch.object(ugc,'update') as update:
+            with self.assertRaises(ValueError):save_private(self.cloud,local)
+        personal.assert_not_called();update.assert_not_called()
     def test_links_are_separate_for_accounts_and_regions(self):
         a=binding_key(self.cloud,'local-id')
         self.cloud.profile=lambda:{'rcu':{'rcuAccountId':'ACCOUNT_B'}}

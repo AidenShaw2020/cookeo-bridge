@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.1 — 2026-10-21
+
+- Separate native PERSONAL adaptation creation from explicit author publication. New personal saves require a compatible published catalog base; cancelling its selector makes no cloud write. A live BE/nl test verified PRIVATE + PERSONAL content, the unchanged catalog source and personal-list indexing with status PERSONAL; official mobile UI display remains unconfirmed.
+- Private saves never create or update authored sources. A PRIVATE-access author record entered moderation in earlier testing; the author endpoint also ignored a requested PRIVATE status.
+- Public author submission requires an own food photograph and reports moderation/correction separately from approved publication. The payload is tested with mocked responses; no synthetic public publication was performed.
+- Prevent automatic duplicate creation after a lost response; protect catalog originals and scope ownership to the account/region.
+- Preserve the previous visibility selection if a cloud change fails.
+- Fix removal from online cookbooks by resolving variant IDs to top recipe IDs; live removal preserved the catalog original. Cookbook membership and author-record deletion use different API operations.
+
 ## 0.3.0 — 2026-10-21
 
 - First public Home Assistant repository package with icons, English/Czech documentation and MIT licensing.

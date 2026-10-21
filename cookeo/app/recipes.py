@@ -9,7 +9,7 @@ ACTIONS=('manual','prep','add','stir','wait','sear_strong','sear_medium','sear_g
          'bake','air_fry','keep_warm','serve','custom')
 COURSES=('main','starter','soup','side','dessert','breakfast','snack','sauce','drink','other')
 FIELDS={'title','ingredients','steps','notes','favorite','cloud_id','prep_minutes','cook_minutes',
-        'servings','course','ingredient_items','flow','author','photo','visibility'}
+        'servings','course','ingredient_items','flow','author','photo','visibility','personal_source_id'}
 
 
 def minutes(value):
@@ -36,6 +36,9 @@ def normalize(value):
     cloud=value.get('cloud_id')
     if cloud is not None and (not isinstance(cloud,str) or len(cloud)>128):raise ValueError('Neplatný cloudový recept.')
     result['cloud_id']=cloud
+    source=value.get('personal_source_id')
+    if source is not None and (not isinstance(source,str) or len(source)>128):raise ValueError('Invalid personal recipe source.')
+    result['personal_source_id']=source
     result['author']=text(value.get('author',''),100)
     visibility=value.get('visibility','PRIVATE')
     if visibility not in ('PRIVATE','PUBLIC'):raise ValueError('Invalid recipe visibility.')

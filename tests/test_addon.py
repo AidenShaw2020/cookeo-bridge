@@ -167,6 +167,18 @@ class ProtocolTests(unittest.TestCase):
         with self.assertRaises(ValueError):accept_redirect('gsmoduser://tokens#state=foreign','state','nonce','client','moulinex')
 
 
+class CookbookRemoveTests(unittest.TestCase):
+    def test_remove_resolves_variant_to_top_recipe_before_delete(self):
+        with tempfile.TemporaryDirectory() as folder:
+            store=Store(folder);cloud=Cloud(store)
+            with patch.object(cloud,'recipe',return_value={'groupingId':{'functionalId':'TOP_RECIPE'}}) as recipe,patch.object(cloud,'request',return_value=None) as request:
+                cloud.collection('OUR_BOOK','remove',{'recipe_id':'VARIANT_ID'})
+            recipe.assert_called_once_with('VARIANT_ID')
+            path,method,body=request.call_args.args
+            self.assertEqual(method,'DELETE');self.assertIn('/collections/PRO/OUR_BOOK/recipes?',path)
+            self.assertEqual(body,{'topRecipeIds':['TOP_RECIPE']});store.close()
+
+
 class SendTests(unittest.IsolatedAsyncioTestCase):
     async def test_recipe_payload_contains_only_selected_recipe_and_variant(self):
         from types import SimpleNamespace
