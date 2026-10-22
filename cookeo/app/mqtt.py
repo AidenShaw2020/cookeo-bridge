@@ -24,7 +24,7 @@ def discovery(device):
         config={'name':name,'unique_id':node+'_'+key,'device':info,'state_topic':base+'/state',
                 'value_template':'{{ value_json.'+key+' if value_json.'+key+' is not none else none }}',
                 'availability':[{'topic':'cookeo_bridge/availability'},{'topic':base+'/availability'}],
-                'availability_mode':'all','origin':{'name':'Cookeo Bridge','sw_version':'0.4.5'}}
+                'availability_mode':'all','origin':{'name':'Cookeo Bridge','sw_version':'0.4.6'}}
         if key in ('status','mode'):
             # Localized entity state, with the stable protocol code as an attribute.
             label=key+'_label'

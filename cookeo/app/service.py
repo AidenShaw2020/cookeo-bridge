@@ -3,10 +3,13 @@ import asyncio
 from dataclasses import dataclass,field
 import json
 import time
+from time import monotonic
 import secrets
 from .models import CookeoStatus,CookeoShadow
 from .programs import program_name
 from .telemetry_labels import PHASES,MODES,telemetry_label
+
+STATUS_REFRESH_INTERVAL=30
 
 
 @dataclass
@@ -52,6 +55,7 @@ class Service:
         self.resources=None;self.connected=False;self.last_error=None;self.events=asyncio.Queue(maxsize=500)
         self.wake=asyncio.Event();self.task=None;self.expiration=0
         self.pending_recipe_updates={}
+        self.next_status_refresh=0
 
     @property
     def language(self):
@@ -98,11 +102,28 @@ class Service:
             for topic in topics:
                 response=await asyncio.to_thread(lambda t=topic:connection.subscribe(t,mqtt.QoS.AT_LEAST_ONCE,callback)[0].result(timeout=10))
                 if response.get('qos') is None:raise RuntimeError('Odběr stavu byl odmítnut.')
-            await asyncio.to_thread(lambda p=prefix:connection.publish(p+'/get',payload='{}',qos=mqtt.QoS.AT_MOST_ONCE)[0].result(timeout=10))
-            await asyncio.to_thread(lambda d=device:connection.publish(d['thing_type']+'/'+d['id']+'/getCookingStatus',
-                payload='{}',qos=mqtt.QoS.AT_LEAST_ONCE)[0].result(timeout=10))
+        await self.refresh_status(force=True)
         self.connected=True;self.last_error=None
         for state in self.states.values():state.source_connected=True
+
+    async def refresh_status(self,force=False):
+        """Read snapshots; never write desired state or start a cooking operation.
+
+        Some firmware only pushes phase changes, not countdown ticks. Re-publishing
+        our cache cannot refresh those values; ask the cooker on the existing session.
+        """
+        connection=self.connection
+        if not connection or (not force and monotonic()<self.next_status_refresh):return False
+        from awscrt import mqtt
+        for state in self.states.values():
+            device=state.device
+            prefix='$aws/things/'+device['thing_type']+'-'+device['id']+'/shadow'
+            await asyncio.to_thread(lambda p=prefix:connection.publish(p+'/get',payload='{}',qos=mqtt.QoS.AT_MOST_ONCE)[0].result(timeout=10))
+            topic=device['thing_type']+'/'+device['id']+'/getCookingStatus'
+            await asyncio.to_thread(lambda t=topic:connection.publish(t,payload='{}',qos=mqtt.QoS.AT_LEAST_ONCE)[0].result(timeout=10))
+        # Schedule from completion: no catch-up bursts after a slow connection.
+        self.next_status_refresh=monotonic()+STATUS_REFRESH_INTERVAL
+        return True
 
     async def loop(self):
         while self.running:
@@ -114,7 +135,7 @@ class Service:
                 continue
             try:
                 self.wake.clear();await self.connect()
-                next_publish=time.monotonic()+30
+                next_publish=monotonic()+30
                 while self.running and not self.wake.is_set() and time.time()<self.expiration-300:
                     try:
                         topic,data=await asyncio.wait_for(self.events.get(),1)
@@ -123,9 +144,10 @@ class Service:
                             if topic.startswith(state.device['thing_type']+'/'+identifier+'/') or topic.startswith('$aws/things/'+state.device['thing_type']+'-'+identifier+'/'):
                                 state.receive(topic,data);self.bridge.publish(identifier,state.public(self.language))
                     except asyncio.TimeoutError:pass
-                    if time.monotonic()>=next_publish:
+                    await self.refresh_status()
+                    if monotonic()>=next_publish:
                         for identifier,state in self.states.items():self.bridge.publish(identifier,state.public(self.language))
-                        next_publish=time.monotonic()+30
+                        next_publish=monotonic()+30
             except asyncio.CancelledError:break
             except Exception as error:
                 self.last_error=type(error).__name__
@@ -188,8 +210,8 @@ class Service:
             self.pending_recipe_updates.pop(token,None)
             if not future.done():future.cancel()
         # Publishing is not proof the cooker loaded it. Never automatically retry.
-        deadline=time.monotonic()+15
-        while time.monotonic()<deadline:
+        deadline=monotonic()+15
+        while monotonic()<deadline:
             if state.last_recipe_event and state.last_recipe_event>=sent and state.status.recipe_id in (top,variant):
                 return {'published':True,'cloud_accepted':True,'device_confirmed':True}
             await asyncio.sleep(.5)

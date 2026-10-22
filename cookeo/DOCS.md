@@ -103,3 +103,7 @@ The UI and Docker image have been tested independently of Supervisor, with HA MQ
 Program names follow the interface language, including the live dashboard, recipe steps and program selector. All 25 programs returned by the Infinity catalog are mapped by stable ID; unknown future IDs retain the manufacturer's label.
 
 Program duration is the reported DURATION parameter in seconds, separately from remaining time. Remaining time uses the appliance countdown, or target minus reported elapsed time during cooking only. No warm-up ETA is inferred from percentages or wall-clock timestamps. During the live warm-up check, both the cooking event and shadow omitted timing and target parameters, so both time fields correctly remained unknown.
+
+### Countdown refresh
+
+The add-on subscribes to live events and also reads `getCookingStatus` and `shadow/get` every 30 seconds using the existing MQTT session. The appliance may not push countdown ticks automatically. Re-publishing the cached state is not a fresh reading. Only actual response values update the countdown; no local per-second estimate is generated. A delayed or absent cloud response can still delay updates. These reads do not start, stop or modify cooking.

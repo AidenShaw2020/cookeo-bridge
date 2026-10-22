@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.6 — 2026-10-22
+
+- Request current cooking status and connection shadow every 30 seconds on the existing cloud session. Some firmware only pushes phase changes, leaving cached countdowns unchanged until explicitly queried. Requests are read-only; no cooking command or desired-state update is sent.
+
 ## 0.4.5 — 2026-10-22
 
 - Localize cooking-status and mode entity values using the interface language, matching the program entity. Stable raw MQTT status/mode fields remain unchanged and are also exposed as the entity attribute `code`.

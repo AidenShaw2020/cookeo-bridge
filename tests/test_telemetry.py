@@ -123,3 +123,71 @@ class EntityLanguageTests(unittest.TestCase):
         self.assertEqual(service.public()['devices'][0]['mode_label'],'Ruční')
         store.language='en'
         self.assertEqual(service.public()['devices'][0]['mode_label'],'Manual')
+
+
+class StatusRefreshTests(unittest.IsolatedAsyncioTestCase):
+    def service(self):
+        from types import SimpleNamespace
+        from app.service import Service
+        from app.mqtt import Bridge
+        service=Service(SimpleNamespace(),Bridge())
+        service.states={'QA':DeviceState({'id':'QA','thing_type':'COO002'})}
+        self.sent=[]
+        class Connection:
+            def publish(inner,topic,payload,qos):
+                self.sent.append((topic,json.loads(payload)))
+                return (SimpleNamespace(result=lambda timeout:None),0)
+        service.connection=Connection()
+        return service
+
+    async def test_periodic_requests_use_existing_connection_and_only_read_topics(self):
+        from unittest.mock import patch
+        service=self.service();connection=service.connection
+        with patch('app.service.monotonic',return_value=100):
+            self.assertTrue(await service.refresh_status(force=True))
+        self.assertEqual(self.sent,[('$aws/things/COO002-QA/shadow/get',{}),('COO002/QA/getCookingStatus',{})])
+        self.assertEqual(service.next_status_refresh,130)
+        with patch('app.service.monotonic',return_value=129):
+            self.assertFalse(await service.refresh_status())
+        self.assertEqual(len(self.sent),2)
+        with patch('app.service.monotonic',return_value=130):
+            self.assertTrue(await service.refresh_status())
+        self.assertEqual(len(self.sent),4)
+        self.assertIs(service.connection,connection)
+        with patch('app.service.monotonic',return_value=1000):
+            self.assertTrue(await service.refresh_status())
+        self.assertEqual(len(self.sent),6)  # One cycle, never replay missed intervals.
+        self.assertEqual(service.next_status_refresh,1030)
+
+    async def test_disconnected_refresh_does_not_publish_or_invent_data(self):
+        service=self.service();service.connection=None
+        self.assertFalse(await service.refresh_status(force=True))
+        self.assertEqual(self.sent,[])
+        self.assertIsNone(service.states['QA'].public()['remaining'])
+
+    async def test_response_refreshes_counter_instead_of_republishing_cache(self):
+        from unittest.mock import patch
+        service=self.service();state=service.states['QA']
+        state.receive('x/cookingStatus',{'currentStatus':'cooking','remainingTime':2078,'version':10})
+        with patch('app.service.monotonic',return_value=100):
+            await service.refresh_status(force=True)
+        self.assertEqual(state.public()['remaining'],2078)  # Request itself is not a reading.
+        state.receive('x/cookingStatus',{'currentStatus':'cooking','remainingTime':207,'version':11})
+        self.assertEqual(state.public()['remaining'],207)
+
+    async def test_live_loop_checks_refresh_after_processing_events(self):
+        from types import SimpleNamespace
+        from unittest.mock import AsyncMock
+        service=self.service();service.cloud.store=SimpleNamespace(get=lambda key,default=None:True if key=='tokens' else 'en')
+        service.running=True
+        async def connect():
+            service.expiration=10**12
+            service.events.put_nowait(('COO002/QA/cookingStatus',{'currentStatus':'cooking','remainingTime':200}))
+        async def refresh():
+            service.running=False
+        service.connect=AsyncMock(side_effect=connect)
+        service.refresh_status=AsyncMock(side_effect=refresh)
+        service.disconnect=AsyncMock()
+        await service.loop()
+        service.refresh_status.assert_awaited_once()
+        self.assertEqual(service.states['QA'].public()['remaining'],200)
