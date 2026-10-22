@@ -166,7 +166,8 @@ class CookeoStatus:
         """Return a new status with non-None fields from ``other`` overriding."""
         changed_program = bool(other.program and (not self.program or other.program.key != self.program.key))
         phase_changed = bool(other.current_status and other.normalized_status != self.normalized_status)
-        new_run = changed_program or (phase_changed and other.normalized_status in {'ready', 'warming', 'idle', 'menu', 'off'})
+        new_run = changed_program or (phase_changed and (other.normalized_status in {'ready', 'idle', 'menu', 'off'}
+                    or (other.normalized_status == 'warming' and self.normalized_status != 'ready')))
         reset_counters = new_run or (phase_changed and other.normalized_status not in {'paused', 'alert'})
         return CookeoStatus(
             current_status=other.current_status or self.current_status,

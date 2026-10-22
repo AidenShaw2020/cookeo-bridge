@@ -60,3 +60,11 @@ class TelemetryTests(unittest.TestCase):
         self.assertEqual(cooking.display_remaining_time,870)
         partial=cooking.merge(CookeoStatus(elapsed_time=60))
         self.assertEqual(partial.display_remaining_time,840)
+
+    def test_ready_target_survives_starting_the_same_program(self):
+        ready=CookeoStatus(current_status='ready',program=CookeoProgram('A','Selected'),
+            parameters=[{'type':'DURATION','value':'900'}],remaining_time=900)
+        warming=ready.merge(CookeoStatus(current_status='warming'))
+        self.assertEqual(warming.display_duration,900)
+        self.assertIsNone(warming.display_remaining_time)
+        self.assertEqual(warming.program.key,'A')
