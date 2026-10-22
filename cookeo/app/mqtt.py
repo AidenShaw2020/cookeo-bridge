@@ -6,7 +6,7 @@ import threading
 
 FIELDS=(('status','Stav vaření',None,None),('mode','Režim',None,None),
         ('program','Program',None,None),('recipe','Recept',None,None),
-        ('remaining','Zbývající čas','s','duration'),('elapsed','Uplynulý čas','s','duration'),
+        ('duration','Čas programu','s','duration'),('remaining','Zbývající čas','s','duration'),('elapsed','Uplynulý čas','s','duration'),
         ('progress','Průběh','%',None),('temperature','Cílová teplota','°C','temperature'),
         ('step','Krok receptu',None,None),('firmware','Firmware',None,None),
         ('error','Chyba',None,None))
@@ -24,7 +24,7 @@ def discovery(device):
         config={'name':name,'unique_id':node+'_'+key,'device':info,'state_topic':base+'/state',
                 'value_template':'{{ value_json.'+key+' if value_json.'+key+' is not none else none }}',
                 'availability':[{'topic':'cookeo_bridge/availability'},{'topic':base+'/availability'}],
-                'availability_mode':'all','origin':{'name':'Cookeo Bridge','sw_version':'0.4.1'}}
+                'availability_mode':'all','origin':{'name':'Cookeo Bridge','sw_version':'0.4.2'}}
         if unit:config['unit_of_measurement']=unit
         if kind:config['device_class']=kind
         if key in ('firmware','error'):config['entity_category']='diagnostic'

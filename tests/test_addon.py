@@ -144,7 +144,7 @@ class SecurityTests(unittest.IsolatedAsyncioTestCase):
 
 class ProtocolTests(unittest.TestCase):
     def test_mqtt_entities_have_no_commands_and_use_real_availability(self):
-        configs=discovery(device());self.assertEqual(len(configs),12)
+        configs=discovery(device());self.assertEqual(len(configs),13)
         for config in configs.values():self.assertNotIn('command_topic',config)
         config=next(v for k,v in configs.items() if '/remaining/' in k)
         self.assertEqual(config['device_class'],'duration');self.assertEqual(config['availability_mode'],'all')

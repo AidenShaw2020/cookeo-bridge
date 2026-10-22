@@ -21,3 +21,14 @@ assert.equal(steps[0].operations[0].duration,'15 min');
 assert.equal(detail.ingredientLabel(steps[0].ingredients[0],2),'400 ml vody');
 assert.equal(steps[1].ingredients[0],'Salt to taste');
 console.log('Recipe detail: author, aggregate ratings, step programs, ingredient references and scaling passed.');
+
+// Both runtime and recipe details use the same ID dictionary in both languages.
+const dictionary=JSON.parse(fs.readFileSync(path.join(__dirname,'../cookeo/app/web/programs.json'),'utf8'));
+vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../cookeo/app/web/programs.js'),'utf8'),context);
+for(const [id,names] of Object.entries(dictionary))for(const lang of ['cs','en'])
+ assert.equal(context.cookeoProgramName(id,'Foreign label',lang),names[lang]);
+context.uiLanguage='cs';
+assert.equal(detail.stepModels(recipe)[0].operations[0].name,'Vysoký tlak');
+context.uiLanguage='en';
+assert.equal(detail.stepModels(recipe)[0].operations[0].name,'High pressure');
+assert.equal(context.cookeoProgramName('UNKNOWN','Manufacturer label','cs'),'Manufacturer label');

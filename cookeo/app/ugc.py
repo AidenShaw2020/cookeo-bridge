@@ -6,6 +6,7 @@ import secrets
 import unicodedata
 from .cloud import APPS, http, recipe_reference
 from .recipes import normalize,FIELDS
+from .programs import program_name
 
 API='https://sebplatform-direct.api.groupe-seb.com/common-api'
 PROGRAMS={'sear_strong':'PROGRAM_201863','sear_medium':'PROGRAM_201862','sear_gentle':'PROGRAM_201867',
@@ -38,7 +39,7 @@ def public_programs(cloud):
     selection=cloud.selection();out=[]
     for key,value in programs(cloud).items():
         name=value.get('name',{}).get('GS_'+selection['market'],{}).get(selection['lang'],key)
-        out.append({'key':key,'name':name,'action':next((a for a,p in PROGRAMS.items() if p==key),'custom'),
+        out.append({'key':key,'name':program_name(key,name,cloud.store.get('ui_language','en')),'action':next((a for a,p in PROGRAMS.items() if p==key),'custom'),
                     'parameters':[{k:p.get(k) for k in ('key','bottomValue','topValue','defaultValue')}|
                         {'type':(p.get('name') or {}).get('key')} for p in value.get('parameterSettings',{}).values()]})
     return out

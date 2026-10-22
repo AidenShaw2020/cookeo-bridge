@@ -41,3 +41,5 @@ button.danger{color:#fff;background:#c5222c}button.danger:hover{color:#fff;backg
 .recipe-origin{display:flex;flex-wrap:wrap;gap:.7rem;align-items:center;margin:1rem 0;padding:.8rem;background:var(--white);border:1px solid var(--line);border-radius:.7rem}.recipe-origin[hidden]{display:none}.publication-errors{color:var(--danger,#c31d2b)}
 
 #publication-photo{max-height:260px}#publication-flow{padding:0;counter-reset:publication-step}#publication-flow>li{counter-increment:publication-step;border:1px solid var(--line);border-radius:12px;padding:16px;margin:12px 0;list-style:none}#publication-flow>li::before{content:counter(publication-step);display:inline-grid;place-items:center;width:26px;height:26px;margin-right:12px;background:var(--pine);color:white;border-radius:50%}#publication-flow small{display:block;margin:8px 0}#publication-flow .ingredient-chip{display:inline-block;margin:4px 6px 0 0}
+
+.metrics{grid-template-columns:1fr 1fr}.metrics div:last-child{grid-column:1 / -1}.metrics div:nth-child(2){border-right:0}

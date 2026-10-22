@@ -164,13 +164,17 @@ class CookeoStatus:
 
     def merge(self, other: "CookeoStatus") -> "CookeoStatus":
         """Return a new status with non-None fields from ``other`` overriding."""
+        changed_program = bool(other.program and (not self.program or other.program.key != self.program.key))
+        phase_changed = bool(other.current_status and other.normalized_status != self.normalized_status)
+        new_run = changed_program or (phase_changed and other.normalized_status in {'ready', 'warming', 'idle', 'menu', 'off'})
+        reset_counters = new_run or (phase_changed and other.normalized_status not in {'paused', 'alert'})
         return CookeoStatus(
             current_status=other.current_status or self.current_status,
             mode=other.mode or self.mode,
-            progress=other.progress if other.progress is not None else self.progress,
-            elapsed_time=other.elapsed_time if other.elapsed_time is not None else self.elapsed_time,
-            remaining_time=other.remaining_time if other.remaining_time is not None else self.remaining_time,
-            program=other.program or self.program,
+            progress=other.progress if other.progress is not None else None if reset_counters else self.progress,
+            elapsed_time=other.elapsed_time if other.elapsed_time is not None else None if reset_counters else self.elapsed_time,
+            remaining_time=other.remaining_time if other.remaining_time is not None else None if reset_counters else self.remaining_time,
+            program=other.program or (None if new_run else self.program),
             notification=other.notification,  # always replace (transient)
             alert_description=other.alert_description or self.alert_description,
             error=other.error or self.error,
@@ -180,7 +184,7 @@ class CookeoStatus:
             event_date=other.event_date or self.event_date,
             operation_start=other.operation_start or self.operation_start,
             version=other.version if other.version is not None else self.version,
-            parameters=other.parameters if other.parameters is not None else self.parameters,
+            parameters=other.parameters if other.parameters is not None else None if new_run else self.parameters,
         )
 
     # --- Phase-gated derived values -----------------------------------
@@ -213,7 +217,15 @@ class CookeoStatus:
         """
         if self.normalized_status not in PROGRAM_PHASES:
             return None
-        return self.remaining_time
+        if self.remaining_time is not None:
+            return self.remaining_time
+        if self.normalized_status == 'cooking' and self.duration_target is not None and self.elapsed_time is not None:
+            return max(0, self.duration_target - self.elapsed_time)
+        return None
+
+    @property
+    def display_duration(self) -> int | None:
+        return self.duration_target if self.normalized_status in PROGRAM_PHASES else None
 
     @property
     def display_target_temperature(self) -> int | None:

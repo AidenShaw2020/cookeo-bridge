@@ -97,3 +97,9 @@ The HA app stores its SQLite library, encryption key and encrypted settings in `
 If no cooker appears, check account/brand/market/language before pairing. If cloud sign-in works but entities do not appear, check MQTT and HA's MQTT integration. If the device does not confirm a recipe, inspect its display; never interpret an MQTT publish acknowledgement alone as a successful load.
 
 The UI and Docker image have been tested independently of Supervisor, with HA MQTT discovery verified in an isolated HA Core environment. Installation through a production HA OS Supervisor is a separate deployment check. `aarch64` is offered for local builds but needs physical-host verification.
+
+### Program names and timing
+
+Program names follow the interface language, including the live dashboard, recipe steps and program selector. All 25 programs returned by the Infinity catalog are mapped by stable ID; unknown future IDs retain the manufacturer's label.
+
+Program duration is the reported DURATION parameter in seconds, separately from remaining time. Remaining time uses the appliance countdown, or target minus reported elapsed time during cooking only. No warm-up ETA is inferred from percentages or wall-clock timestamps. During the live warm-up check, both the cooking event and shadow omitted timing and target parameters, so both time fields correctly remained unknown.

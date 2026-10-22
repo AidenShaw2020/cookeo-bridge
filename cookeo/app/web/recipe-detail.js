@@ -54,7 +54,7 @@
      operations:(step.sequences||[]).filter(sequence=>sequence.applianceGroup?.key===group).flatMap(sequence=>sequence.operations||[]).map(operation=>{
        const parameters=operation.parameters||[],value=key=>parameters.find(p=>p.commonKey===key)?.value;
        const numeric=key=>{const raw=value(key);return raw!==undefined&&raw!==null&&raw!==''&&Number.isFinite(Number(raw))?Number(raw):undefined;};
-       return {name:operation.program?.name||tr('Program hrnce'),kind:programKind(operation.program?.key),
+       return {name:globalThis.cookeoProgramName?cookeoProgramName(operation.program?.key,operation.program?.name||tr('Program hrnce')):operation.program?.name||tr('Program hrnce'),kind:programKind(operation.program?.key),
          duration:duration(value('DURATION')),temperature:numeric('TEMPERATURE'),speed:numeric('SPEED')};
      }),
      kind:step.type?.key==='COOKING'?'cooker':'prep'

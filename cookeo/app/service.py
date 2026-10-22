@@ -5,6 +5,7 @@ import json
 import time
 import secrets
 from .models import CookeoStatus,CookeoShadow
+from .programs import program_name
 
 
 @dataclass
@@ -28,12 +29,13 @@ class DeviceState:
             self.status.alert_description=str(data.get('description') or data.get('message') or '')[:256]
         self.last_event=time.time()
 
-    def public(self):
+    def public(self,language='en'):
         current=self.status;phase=current.normalized_status
         online=self.shadow.connected
         active=phase in ('warming','cooking','keep_warm','depressurization','paused','delayed','ready','done','alert')
         return {'connected':online,'source_connected':self.source_connected,'status':phase,
-                'mode':current.mode if active else None,'program':current.program.name if active and current.program else None,
+                'mode':current.mode if active else None,'program':program_name(current.program.key,current.program.name,language) if active and current.program else None,
+                'program_id':current.display_program_id,'duration':current.display_duration,
                 'recipe':current.display_recipe_title,'step':current.display_recipe_step,
                 'remaining':current.display_remaining_time,'elapsed':current.elapsed_time if active else None,
                 'progress':current.display_progress,'temperature':current.display_target_temperature,
@@ -48,6 +50,11 @@ class Service:
         self.wake=asyncio.Event();self.task=None;self.expiration=0
         self.pending_recipe_updates={}
 
+    @property
+    def language(self):
+        store=getattr(self.cloud,'store',None)
+        return store.get('ui_language','en') if store else 'en'
+
     def start(self):
         self.running=True;self.task=asyncio.create_task(self.loop())
 
@@ -61,7 +68,7 @@ class Service:
             try:await asyncio.to_thread(lambda:old.disconnect().result(timeout=5))
             except Exception:pass
         self.connected=False;self.resources=None
-        for state in self.states.values():state.source_connected=False;self.bridge.publish(state.device['id'],state.public())
+        for state in self.states.values():state.source_connected=False;self.bridge.publish(state.device['id'],state.public(self.language))
 
     async def connect(self):
         loop=asyncio.get_running_loop()
@@ -111,10 +118,10 @@ class Service:
                         self.shadow_response(topic,data)
                         for identifier,state in self.states.items():
                             if topic.startswith(state.device['thing_type']+'/'+identifier+'/') or topic.startswith('$aws/things/'+state.device['thing_type']+'-'+identifier+'/'):
-                                state.receive(topic,data);self.bridge.publish(identifier,state.public())
+                                state.receive(topic,data);self.bridge.publish(identifier,state.public(self.language))
                     except asyncio.TimeoutError:pass
                     if time.monotonic()>=next_publish:
-                        for identifier,state in self.states.items():self.bridge.publish(identifier,state.public())
+                        for identifier,state in self.states.items():self.bridge.publish(identifier,state.public(self.language))
                         next_publish=time.monotonic()+30
             except asyncio.CancelledError:break
             except Exception as error:
@@ -134,7 +141,7 @@ class Service:
 
     def public(self):
         return {'cloud_connected':self.connected,'mqtt_connected':self.bridge.connected,'last_error':self.last_error,
-                'devices':[{**s.device,**s.public()} for s in self.states.values()]}
+                'devices':[{**s.device,**s.public(self.language)} for s in self.states.values()]}
 
     def transfer_state(self,device_id,confirm_idle=False):
         state=self.states.get(device_id)

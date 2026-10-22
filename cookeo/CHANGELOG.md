@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.2 — 2026-10-22
+
+- Localize all 25 Infinity programs, plus known Touch/classic programs, in live telemetry, recipe steps and the editor using the interface language (English/Czech), independently of account locale.
+- Show reported program duration separately from remaining time; expose duration through MQTT discovery. Derive remaining time from target minus reported elapsed time only during cooking when no explicit countdown is available.
+- Clear stale timing values at phase/program transitions. Warm-up without reported timing stays unknown; progress is not converted into an ETA.
+
 ## 0.4.1 — 2026-10-22
 
 - Clarify manual browser sign-in in the English/Czech UI and guides: retrieve the complete gsmoduser callback from the manufacturer return page source (Ctrl+U, Ctrl+F), not the address bar.
