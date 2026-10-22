@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.4 — 2026-10-22
+
+- Keep the cooker illustration in the device card layout so the software/status divider stays below it on desktop and mobile, including when the product caption is hidden.
+
 ## 0.4.3 — 2026-10-22
 
 - Remove the redundant product-code caption from the device dashboard and the specific CMMF code from the public README. Model compatibility checks remain in place.
