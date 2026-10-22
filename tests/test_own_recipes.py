@@ -76,12 +76,12 @@ class PrivateRecipeTests(unittest.TestCase):
             with self.assertRaises(ValueError):save_private(self.cloud,local)
         create.assert_not_called();update.assert_not_called()
         self.assertFalse(self.store.get('own_recipe_links',{}))
-    def test_source_must_be_published_compatible_and_in_account_locale(self):
+    def test_source_must_be_published_and_compatible(self):
         valid={'fid':{'functionalId':'PUBLIC_SOURCE'},'market':'GS_BE','lang':'nl','status':'PUBLISHED',
             'privacyLevel':{'key':'PUBLIC'},'applianceGroups':[{'key':'APPLIANCE_GROUP_3019'}]}
         self.cloud.recipe=lambda ref:valid
         self.assertIs(ugc.personal_source(self.cloud,{'personal_source_id':'PUBLIC_SOURCE'}),valid)
-        for changes in ({'market':'GS_CZ'},{'lang':'cs'},{'status':'TO_BE_CORRECTED'},
+        for changes in ({'status':'TO_BE_CORRECTED'},
                         {'privacyLevel':{'key':'PRIVATE'}},{'applianceGroups':[]}):
             self.cloud.recipe=lambda ref,changes=changes:{**valid,**changes}
             with self.subTest(changes=changes),self.assertRaises(ValueError):

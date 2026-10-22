@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.0 — 2026-10-22
+
+- Distinguish authored recipes and imported personal adaptations in cards, details, editor and version-4 exports. Preserve original title/author/source and prevent relabelling imports as independent authorship.
+- Remove the unrelated catalog-base picker. Imported recipes automatically use their original; new author recipes start from a blank local draft.
+- Add an author review with native required-field checks, own-photo guidance, terms link and explicit submission confirmation. Cancel/review does not publish.
+- Separate public author submission and its own private PERSONAL device variant, including moderation status, device readiness and incomplete-result protection.
+- Keep photo failures retryable before the recipe POST; prevent duplicate roots after uncertain submission. Preserve legacy ownership bindings and protect them during incomplete deletion.
+- Validate both workflows with mocked backend and English/Czech browser tests. No new public synthetic submission or cooker command was used in this release.
+
 ## 0.3.2 — 2026-10-21
 
 - Recognize confirmed PERSONAL soft deletion: the lite API retains a DELETED record while the mobile endpoint returns 404. Both conditions are required before removing local ownership bindings.

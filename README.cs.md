@@ -36,20 +36,31 @@ mqtt_tls: false
 
 Při přechodu z PC nejdřív zastav starý vývojový proces, pak spusť doplněk. Přihlášení v HA můžeš provést znovu; registrace hrnce tím nezanikne. Místní recepty přenes přes **Moje recepty → Export / Import**. Celé soukromé `.dev-data` ani tokeny nikam na GitHub nekopíruj. Samostatné místní poznámky k online receptům nejsou součástí exportu knihovny.
 
-## Recepty a soukromí
+## Autorské recepty a osobní úpravy
 
-- **Uložit**: pouze místní knihovna.
-- **Uložit na cloud**: vytvoří nebo aktualizuje osobní kopii `PERSONAL`. Při prvním uložení vybereš publikovaný základ ze stejné země a jazyka účtu. Zrušení výběru nic na cloudu nezaloží.
-- **Přiřadit online kuchařku**: výběr pro již nahraný recept; otevření ani zrušení nic nenahrává.
-- **Odeslat na hrnec**: ověří a odešle aktuální uloženou osobní kopii. Neuložené změny nejprve ulož na cloud. Vaření spustíš až na hrnci.
+Knihovna rozlišuje **Autorský recept** vytvořený od nuly a **Osobní úpravu** importovaného online receptu. Označení je na kartě, v detailu i editoru. Import zachovává název a autora originálu i odkaz na něj; upravenou kopii nelze přejmenováním typu vydávat za samostatný autorský recept. Původ se zachovává při úpravách i JSON exportu/importu.
 
-**Osobní úprava a veřejný autorský recept mají odlišný postup.** Autorský formulář výrobce vyžaduje celý recept a fotografii a soukromou volbu nenabízí. Při živém testu jeho API ignorovalo požadovaný stav `PRIVATE`. Dřívější autorský záznam se soukromým přístupem skončil ve schvalování a ve stavu `TO_BE_CORRECTED`. Anonymní odpověď 404 tedy ověřila omezení přístupu, nikoli vynechání schvalování.
+### Import online receptu
 
-Opravené soukromé ukládání zakládá pouze nativní osobní úpravu `PERSONAL` vybraného publikovaného receptu. Nevytváří ani neaktualizuje autorský záznam a nepřebírá cizí fotografii pokrmu. Původní katalogový recept se nemění. Stejný základ nelze použít pro dvě místní osobní kopie; po ztrátě odpovědi se další kopie automaticky nezakládá. **Živý test BE/nl vytvořil jednu kopii PRIVATE + PERSONAL, ověřil suroviny i kroky a našel ji ve vyhledávání osobních receptů s filtrem PERSONAL. Katalogový základ zůstal zachovaný a nevznikl autorský záznam. Zobrazení v oficiální mobilní aplikaci zatím není potvrzené.**
+1. V **Online receptech** otevři recept a zvol **Uložit kopii do knihovny**.
+2. Uprav si suroviny, kroky, porce a časy. **Uložit** ukládá pouze místně.
+3. **Uložit osobní úpravu** uloží soukromou variantu `PERSONAL` automaticky navázanou na importovaný originál. Žádný další základ nehledáš; katalogový originál se nemění. Požadavek zachovává původní zemi/jazyk receptu. Jiné kombinace regionů může výrobce odmítnout a zatím nejsou živě ověřené.
+4. **Odeslat na hrnec** přenese aktuální ověřenou osobní kopii do volného hrnce. Neodesílá neuložené změny a nespouští vaření. **Přiřadit online kuchařku** otevírá výběr pro už nahranou kopii; zrušení nic nenahrává.
 
-Přepnutí již nahraného receptu na **Veřejný** výslovně odešle autorskou verzi s vlastní fotografií výrobci ke schválení. Osobní kopie pro hrnec zůstává soukromá. Štítek odlišuje čekání na schválení, požadavek na opravu a schválené zveřejnění. Samotné odeslání neznamená okamžitou dostupnost všem. Nový požadavek s fotografií je ověřen testovací odpovědí, nikoli živým veřejným publikováním. Volba **Soukromý** žádá o soukromý přístup k vlastní autorské verzi; nemaže historii schvalování.
+Osobní úprava se neposílá do toku nového autorského receptu. Vlastníkem místní kopie je přihlášený účet; původní autor je zobrazený zvlášť. Poznámky zůstávají místní.
 
-Autora určuje přihlášený účet; přezdívka je v horní liště. Poznámky zůstávají místní. Osobní kopie nyní nenahrává místní fotografii. Import přenáší obsah, nikoli vlastnictví původního receptu nebo vazby na existující cloudové kopie. Pro novou osobní kopii zvol dosud neupravený základ, aby nenahradila úpravu z jiné instalace.
+### Nový recept od nuly
+
+1. Zvol **Nový recept** a napiš vlastní název, suroviny a kroky včetně programů hrnce. Můžeš ho uložit jako místní koncept. Žádný cizí základ se nevybírá.
+2. Přidej vlastní fotografii hotového pokrmu a klikni na **Zkontrolovat a publikovat**.
+3. Náhled vypíše chybějící požadavky podle formuláře výrobce: fotografie, podporovaný typ jídla, 1–99 porcí, příprava alespoň 1 minutu, suroviny přiřazené ke krokům, číselné množství v povoleném rozsahu, popis každého kroku do 1000 znaků a alespoň jeden program hrnce. Parametry se ověřují podle modelu. Součástí jsou pokyny pro fotografii a odkaz na podmínky výrobce.
+4. Zkontroluj obsah a výslovně potvrď odeslání. Otevření ani zrušení náhledu nic nepublikuje. Výrobce recept může schválit nebo vrátit k opravě; odeslání neznamená okamžité zveřejnění všem.
+
+Po potvrzení autorského záznamu se odděleně připravuje soukromá kopie `PERSONAL` pro hrnec, navázaná na **tento vlastní autorský záznam**, nikoli na cizí recept. Schvalování a připravenost kopie pro hrnec jsou různé stavy. Přenos je dostupný až po ověření osobní kopie. Pokud výrobce přijme autorský recept, ale jeho osobní varianta zatím není dostupná, doplněk to uvede a zachová již získané ID místo založení dalšího autorského záznamu.
+
+Štítky rozlišují soukromý přístup, čekání na schválení, požadavek na opravu a schválené zveřejnění. U odeslané autorské verze lze požádat o soukromou viditelnost; opětovná veřejná volba otevře publikační náhled. Historie schvalování tím nezaniká. Po ztrátě odpovědi na vytvoření se nový záznam automaticky nezakládá. Selhání nahrání fotografie před založením receptu lze opakovat.
+
+**Ověření:** soukromé založení, čtení a smazání PERSONAL prošlo živým testem BE/nl; dříve byl ověřen i přenos do hrnce. Nový celý autorský postup včetně fotografie, aktualizace a přípravy osobní kopie je ověřen náhradními odpověďmi backendu a testy rozhraní. Žádný nový syntetický recept jsme veřejně neodesílali. Zobrazení v originální mobilní aplikaci a schválení výrobcem zatím potvrzené nejsou. Dřívější autorský záznam s přístupem PRIVATE prošel moderací; soukromá viditelnost ani anonymní 404 nejsou důkazem vynechání schvalování.
 
 **Odebrání z kuchařky je jiná operace než smazání autorského receptu.** Odebrání katalogového receptu ruší pouze jeho zařazení, původní recept zůstává. Smazání kuchařky odstraní kolekci, nikoli původní recepty. Obě operace prošly živým testem v BE/nl. Verze 0.3.1 opravuje odebírání tím, že převádí ID varianty ze seznamu na ID hlavního receptu.
 

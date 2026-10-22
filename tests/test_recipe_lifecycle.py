@@ -14,7 +14,7 @@ from app.store import Store
 from app.server import make_app
 
 def draft():
-    return {'title':'Lifecycle test','steps':'A manual step','visibility':'PRIVATE'}
+    return {'title':'Lifecycle test','steps':'A manual step','visibility':'PRIVATE','cloud_id':'PUBLIC_SOURCE','recipe_kind':'adaptation'}
 
 class LifecycleTests(unittest.TestCase):
     def setUp(self):
@@ -127,8 +127,8 @@ class LifecycleHTTPTests(unittest.IsolatedAsyncioTestCase):
             response=await self.client.delete('/api/library/'+recipe['id'],headers=self.headers)
         self.assertEqual(response.status,502);self.assertTrue(self.store.recipe(recipe['id']))
         self.assertTrue(self.store.get('own_recipe_links'))
-    async def test_missing_source_fails_before_creation_and_preserves_local_content(self):
-        recipe=self.store.put_recipe(draft())
+    async def test_authored_recipe_requires_explicit_publication_not_private_save(self):
+        recipe=self.store.put_recipe({'title':'Author draft','steps':'Manual draft'})
         with patch.object(self.app['cloud'],'profile',return_value={'rcu':{'rcuAccountId':'TEST_ACCOUNT'}}),patch.object(ugc,'publish_author') as create:
             response=await self.client.post('/api/library/'+recipe['id']+'/cloud',json={},headers=self.headers)
         self.assertEqual(response.status,400);create.assert_not_called();self.assertTrue(self.store.recipe(recipe['id']))

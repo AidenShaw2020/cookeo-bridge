@@ -41,7 +41,7 @@ Use the same email/password as the existing manufacturer account, even if you or
 
 Stop the old PC/Docker bridge before starting the HA app, particularly if both use the same MQTT broker. Open the HA app, sign in, and let the linked device load. Do not open the pairing wizard, factory-reset the cooker or remove it from the manufacturer's account.
 
-Export local recipes from the previous **My recipes** screen and import them into the new installation. This transfers recipe content, not OAuth sessions, remote-copy bindings or separate personal notes on online recipes. On first upload of an imported local recipe, explicitly select an unused compatible catalog base for the new personal copy. Cloud cookbooks and the cooker registration remain on the manufacturer's account.
+Export local recipes from the previous **My recipes** screen and import them into the new installation. This transfers recipe content, not OAuth sessions, remote-copy bindings or separate personal notes on online recipes. JSON import preserves kind and provenance, but does not recover ownership bindings to existing remote variants. Keep a protected full data backup if those bindings must move between installations; do not repeatedly create adaptations of the same original to recover a lost binding. Cloud cookbooks and the cooker registration remain on the manufacturer's account.
 
 ## MQTT and entities
 
@@ -51,20 +51,29 @@ Published entities are read-only telemetry. Missing values remain unknown/unavai
 
 ## Recipes and cookbooks
 
-| Action | Result |
-| --- | --- |
-| Save | Saves only the local library entry. |
-| Save to cloud | Creates or updates a private `PERSONAL` adaptation. For a new copy, explicitly choose a compatible published recipe as its base. Cancelling the selector creates no cloud record. |
-| Assign online cookbook | Opens a cookbook selector for an existing cloud copy. Opening/cancelling does not upload or publish anything. |
-| Send to cooker | Verifies and loads the current saved personal copy on an idle cooker. Does not upload local edits or start cooking. |
+The library distinguishes **Author recipe** (created from scratch) and **Personal adaptation** (imported from an online recipe). Kind and source references survive local edits and JSON export/import; a saved import cannot be relabelled as an independent authored recipe. Cards, details and the editor show the kind. Adaptations retain the original title/author and a link to the source.
 
-**Personal saving and public submission use different API workflows.** The manufacturer's author form requests a complete recipe and photograph and does not offer a private/public choice. Its creation endpoint ignored a requested `PRIVATE` status in our live test. An earlier authored source with private access entered moderation and became `TO_BE_CORRECTED`; anonymous 404 proved restricted access, not absence of moderation.
+### Import and adapt an online recipe
 
-The revised private path creates only a native `PERSONAL` adaptation of a published catalog recipe in the account's market/language. It does not create or update an authored source, copy an unrelated dish photograph or modify the catalog original. A base already linked to another local personal recipe is rejected. A lost creation response is retained for inspection rather than automatically creating another copy. **A live BE/nl test created one PRIVATE + PERSONAL copy, verified its ingredients/steps and found it in the personal-recipe search using status PERSONAL. The published source stayed unchanged and no authored record was created. Appearance in the official mobile UI has not been confirmed.**
+1. Open **Online recipes**, choose a recipe and **Save a copy to library**.
+2. Edit the local ingredients, steps, servings or times. **Save** remains local.
+3. **Save personal adaptation** creates/updates a private `PERSONAL` variant linked automatically to that imported original. There is no separate source-picker and the catalog original is not changed. The original market/language are retained in the adaptation payload; other regional combinations can still be refused by the provider and are not live-verified.
+4. **Send to cooker** uses the current verified personal variant on an idle cooker. It does not upload edits or start cooking. **Assign online cookbook** only opens the selector for an existing uploaded copy.
 
-Choosing **Public** for an uploaded recipe explicitly submits an author version with your own food photograph. The personal device copy remains private. The badge distinguishes submission/pending approval, correction and approved publication; submitting does not mean the recipe is immediately listed for everyone. The photo upload/publication payload is covered by mocked tests and has not been submitted live as part of this fix. Choosing **Private** requests private access for the owned author version; it does not erase previous moderation history.
+Personal adaptations cannot enter the independent author-publication flow. Importing another person's recipe does not transfer its authorship. The signed-in account is the owner of the local copy; the original author is shown separately. Personal notes stay local.
 
-The author comes from the signed-in account. Notes remain local. Private adaptations currently do not upload their local photograph. Importing a recipe does not grant ownership of its catalog source. Export/import transfers content, not existing cloud ownership bindings: choose an unused base for a new personal copy rather than replacing an adaptation created in another installation.
+### Create a new author recipe
+
+1. Choose **New recipe**. Write your own title, ingredients, ingredient references per step and cooker programs. Save a local draft whenever you want; no unrelated catalog base is required.
+2. Add your own photograph of the finished dish. Select **Review and publish**.
+3. The review checks the manufacturer's observed form requirements: photograph, supported course, 1–99 servings, preparation time of at least one minute, ingredients assigned to steps, numeric ingredient quantities in the accepted range, step descriptions up to 1000 characters and at least one cooker program. Program parameters are validated against the selected model. Missing fields are listed before submission. Photo guidance and a link to the manufacturer's terms are shown.
+4. Review the recipe/photo and explicitly confirm submission. Opening or cancelling the review makes no cloud write. The manufacturer can approve the recipe or request corrections; submission is not immediate public listing.
+
+The author endpoint receives the full recipe and uploaded photograph. After it confirms a root, a separate private `PERSONAL` variant is prepared from **that owned author root**, never a random catalog recipe. Public moderation and device-copy readiness are separate states: transfer stays unavailable until the private variant is verified. If the author submission succeeds but the device copy is unavailable, the UI reports that distinction and preserves the author reference rather than submitting another root.
+
+Badges distinguish private access, pending approval, corrections and approved publication. An already submitted author version can request private visibility; making it public again opens the publication review. This does not erase earlier moderation history. A lost creation response blocks automatic duplicate creation; a photo upload failure before the recipe POST remains retryable.
+
+**Verification:** private PERSONAL creation, read-back and deletion were tested live in BE/nl, as was personal transfer earlier. The new complete author review, photo payload, publication/update and owned-root-to-PERSONAL flow are covered by mocked backend/browser tests; no new synthetic recipe was publicly submitted. Appearance in the official mobile UI and eventual approval remain unconfirmed. Earlier PRIVATE author records entered moderation, so PRIVATE access or anonymous 404 must not be presented as proof that an author record bypasses moderation.
 
 **Cookbooks and recipe deletion are different operations.** Removing a catalog recipe from a cookbook only removes that membership; the catalog original remains. Cookbook deletion removes the collection, not its source recipes. Both operations were verified in the BE/nl profile. Version 0.3.1 resolves the variant identifier returned by cookbook search to its top recipe identifier before removal.
 

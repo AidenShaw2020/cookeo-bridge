@@ -18,7 +18,7 @@ from .service import Service
 from .store import Store
 from .discovery import ha_scan, local_scan
 from .options import apply_options
-from .own_recipes import save_cloud,cloud_status,change_visibility,delete_cloud,sendable
+from .own_recipes import save_cloud,save_authored,cloud_status,change_visibility,delete_cloud,sendable
 
 ROOT=Path(__file__).parent
 
@@ -134,24 +134,32 @@ def make_app(folder,*,ingress=False,demo=False,allowed_hosts=None):
             recipes=store.all_recipes()
             if store.get('tokens') and not demo:
                 def cached_states():
-                    from .own_recipes import scope,fingerprint
+                    from .own_recipes import scope,fingerprint,author_fingerprint
                     with cloud.lock:
                         prefix=scope(cloud)+':';links=store.get('own_recipe_links',{})
                         for recipe in recipes:
                             recipe['author']=cloud.cache.get('account_name',recipe.get('author',''))
                             link=links.get(prefix+recipe['id'])
-                            recipe['cloud_state']=({'uploaded':True,'privacy':link.get('privacy'),
+                            authored=recipe.get('recipe_kind')=='authored' and bool(link and link.get('root_reference'))
+                            recipe['cloud_state']=({'uploaded':True,'privacy':link.get('privacy'),'link_kind':'authored' if authored else 'adaptation',
                                 'publication_status':link.get('publication_status'),
                                 'publicly_published':link.get('privacy')=='PUBLIC' and link.get('publication_status') in ('PUBLISHED','VALIDATED_MARKET'),
                                 'personal_status':link.get('recipe_status'),
-                                'current':bool(link.get('verified') and link.get('fingerprint')==fingerprint(recipe))}
-                                if link and link.get('reference') else {'uploaded':False,'creation_pending':bool(link and link.get('creation_pending'))})
+                                'device_ready':bool(link.get('verified') and link.get('fingerprint')==fingerprint(recipe)),
+                                'current':link.get('author_fingerprint')==author_fingerprint(recipe) if authored
+                                    else bool(link.get('verified') and link.get('fingerprint')==fingerprint(recipe))}
+                                if link and (link.get('reference') or link.get('root_reference')) else {'uploaded':False,'creation_pending':bool(link and (link.get('creation_pending') or link.get('root_creation_pending')))})
                 try:await asyncio.to_thread(cached_states)
                 except CloudError:pass  # The local library remains usable offline.
-            return web.json_response({'format':'cookeo-library-v3','recipes':recipes})
+            return web.json_response({'format':'cookeo-library-v4','recipes':recipes})
         return web.json_response(await save_local(await request.json()),status=201)
     async def save_local(value,identifier=None):
         if not isinstance(value,dict):raise ValueError('Neplatný recept.')
+        if identifier:
+            from .recipes import normalize
+            previous=store.recipe(identifier);updated=normalize(value)
+            if any(previous.get(k)!=updated.get(k) for k in ('recipe_kind','cloud_id','personal_source_id')):
+                raise ValueError('Typ a původ uloženého receptu nelze přepsat. Importuj originál jako novou osobní úpravu.')
         if store.get('tokens') and not demo:
             if not cloud.cache.get('account_name'):await asyncio.to_thread(cloud.profile)
             value['author']=cloud.cache.get('account_name','')
@@ -175,6 +183,21 @@ def make_app(folder,*,ingress=False,demo=False,allowed_hosts=None):
         operation={'GET':cloud_status,'POST':save_cloud,'DELETE':delete_cloud}[request.method]
         result=await own_operation(request.match_info['id'],operation)
         return web.json_response(result)
+    async def own_publication(request):
+        require_live();identifier=request.match_info['id'];recipe=store.recipe(identifier)
+        if request.method=='GET':
+            from .ugc import author_requirements
+            errors=await asyncio.to_thread(author_requirements,cloud,recipe)
+            selection=cloud.selection()
+            return web.json_response({'valid':not errors,'errors':errors,'recipe_kind':recipe['recipe_kind'],
+                'terms_url':'https://legal.groupeseb.com/UGC/Core/'+selection['market']+'/'+selection['lang']+'/CPUGC.html'})
+        value=await request.json()
+        if value.get('confirm_publication') is not True:raise ValueError('Potvrď odeslání vlastního receptu a fotografie výrobci ke zveřejnění.')
+        result=await own_operation(identifier,save_authored)
+        from .recipes import FIELDS
+        recipe=store.recipe(identifier)
+        store.put_recipe({**{k:v for k,v in recipe.items() if k in FIELDS},'visibility':'PUBLIC'},identifier)
+        return web.json_response(result)
     async def own_visibility(request):
         value=await request.json();identifier=request.match_info['id'];privacy=value.get('visibility')
         result=await own_operation(identifier,lambda c,r:change_visibility(c,r,privacy))
@@ -193,10 +216,6 @@ def make_app(folder,*,ingress=False,demo=False,allowed_hosts=None):
         require_live()
         from .ugc import public_programs
         return web.json_response({'programs':await asyncio.to_thread(public_programs,cloud)})
-    async def own_sources(request):
-        require_live()
-        from .ugc import personal_sources
-        return web.json_response(await asyncio.to_thread(personal_sources,cloud,request.query.get('q',''),int(request.query.get('page','0'))))
     async def search(request):
         require_live();data=await asyncio.to_thread(cloud.search_recipes,request.query.get('q',''),int(request.query.get('page','0')),request.query.get('lang'))
         return web.json_response(data)
@@ -253,10 +272,10 @@ def make_app(folder,*,ingress=False,demo=False,allowed_hosts=None):
         ('POST','/api/auth/logout',logout),('POST','/api/refresh',refresh),('GET','/api/library',library),
         ('POST','/api/library',library),('PUT','/api/library/{id}',local_recipe),('DELETE','/api/library/{id}',local_recipe),
         ('GET','/api/library/{id}/cloud',own_recipe_cloud),('POST','/api/library/{id}/cloud',own_recipe_cloud),
+        ('GET','/api/library/{id}/publication',own_publication),('POST','/api/library/{id}/publication',own_publication),
         ('DELETE','/api/library/{id}/cloud',own_recipe_cloud),('PUT','/api/library/{id}/visibility',own_visibility),
         ('POST','/api/library/{id}/send',own_recipe_send),
         ('GET','/api/own-recipes/programs',own_programs),
-        ('GET','/api/own-recipes/sources',own_sources),
         ('GET','/api/recipes/search',search),('GET','/api/recipes/{id}/comments',recipe_comments),
         ('GET','/api/recipes/{id}',cloud_recipe),('POST','/api/recipes/send',send_recipe),
         ('GET','/api/recipe-notes',recipe_note),('PUT','/api/recipe-notes',recipe_note),('POST','/api/recipes/review',review),

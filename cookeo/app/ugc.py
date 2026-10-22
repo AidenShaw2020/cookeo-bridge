@@ -3,6 +3,7 @@ import urllib.parse
 import base64
 import re
 import secrets
+import unicodedata
 from .cloud import APPS, http, recipe_reference
 from .recipes import normalize,FIELDS
 
@@ -148,7 +149,7 @@ def create_personal(cloud,recipe,original):
                  domain=original.get('domain') or value['domain'],market=original.get('market') or value['market'],lang=original.get('lang') or value['lang'])
     # Importing an existing recipe can retain its own cover. A newly authored
     # private recipe must not receive an unrelated source recipe's photograph.
-    if recipe.get('cloud_id')==original['fid']['functionalId']:
+    if recipe.get('recipe_kind')=='authored' or recipe.get('cloud_id')==original['fid']['functionalId']:
         if original.get('resourceMedias'):value['resourceMedias']=original['resourceMedias']
         if original.get('cover'):value['cover']=original['cover']
     return request(cloud,'/v3/recipes','POST',value)
@@ -158,33 +159,49 @@ def personal_source(cloud,recipe):
     """Use the app's adaptation flow, never create a private author draft."""
     ref=recipe.get('personal_source_id') or recipe.get('cloud_id')
     if not ref:raise ValueError('Vyber základ pro osobní kopii receptu, stejně jako v aplikaci výrobce.')
-    selection=cloud.selection();group=cloud.appliance_group()
+    group=cloud.appliance_group()
     original=cloud.recipe(ref)
     if not any(g.get('key')==group for g in original.get('applianceGroups',[])):
         raise ValueError('The original recipe is not compatible with this cooker.')
-    if original.get('market')!='GS_'+selection['market'] or original.get('lang')!=selection['lang']:
-        raise ValueError('Zvol základ ve stejné zemi a jazyce jako účet, aby osobní kopie byla dostupná v aplikaci.')
     if original.get('status') not in ('PUBLISHED','VALIDATED_MARKET') or (original.get('privacyLevel') or {}).get('key') not in ('PUBLIC','COMMUNITY'):
         raise ValueError('Jako základ zvol publikovaný katalogový recept, nikoli soukromý autorský záznam.')
     return original
 
 
-def personal_sources(cloud,query='',page=0):
-    selection=cloud.selection();group=cloud.appliance_group()
-    if not isinstance(query,str) or len(query)>200 or type(page) is not int or not 0<=page<=10000:raise ValueError('Invalid recipe source search.')
-    params=urllib.parse.urlencode({'lang':selection['lang'],'market':'GS_'+selection['market'],
-            'page':page,'size':24,'q':query,'groupBy':'topRecipe','myUniverse':'false','myOwnRecipe':'false','withAutomaticSpellcheck':'false'})
-    body={'sort':{'name':'score' if query else 'creationDate','direction':'DESC'},'fieldList':['title','topRecipe.id','privacyLevel','resourceMedias','creator','isAdaptation'],
-            'fieldFilters':[{'field':'lang.key','values':[selection['lang']]},{'field':'market.key','values':['GS_'+selection['market']]},
-                {'field':'applianceGroups.reference.key','values':[group]},
-                {'field':'status.key','values':['PUBLISHED','VALIDATED_MARKET']},{'field':'privacyLevel.key','values':['PUBLIC','COMMUNITY']}],
-            'facetList':[],'facetFilters':[],'nestedFieldFiltersGroup':[],
-            'profileBasedFilters':{'filterApplianceGroup':False,'filterExcludedFoods':False,'filterKitchenwares':False},'ingredientSelected':[]}
-    return cloud.request('/common-api/v4/search/recipes?'+params,'POST',body)
+def author_requirements(cloud,recipe):
+    """Required fields observed in the manufacturer's author form; no writes."""
+    recipe=normalize({k:v for k,v in recipe.items() if k in FIELDS});errors=[]
+    def fail(field,message):errors.append({'field':field,'message':message})
+    if recipe['recipe_kind']!='authored':fail('recipe_kind','Osobní úpravu nelze publikovat jako vlastní autorský recept.')
+    def forbidden(value):return any(char!=' ' and unicodedata.category(char)[0] not in 'LMNP' for char in value)
+    if forbidden(recipe['title']):fail('title','Název receptu nesmí obsahovat emoji ani jiné nepodporované znaky.')
+    if not recipe['photo'].startswith('data:image/'):fail('photo','Přidej vlastní fotografii hotového pokrmu.')
+    if recipe['prep_minutes']<1:fail('prep_minutes','Čas přípravy musí být alespoň 1 minuta.')
+    if recipe['servings']>99:fail('servings','Výrobce přijímá nejvýše 99 porcí.')
+    if recipe['course'] not in COURSES:fail('course','Vyber podporovaný typ jídla: hlavní chod, předkrm, příloha nebo dezert.')
+    if not recipe['ingredient_items']:fail('ingredient_items','Přidej alespoň jednu surovinu.')
+    used={i for step in recipe['flow'] for i in step['ingredient_indices']}
+    if any(i not in used for i in range(len(recipe['ingredient_items']))):fail('ingredient_items','Přiřaď každou surovinu alespoň jednomu kroku.')
+    for item in recipe['ingredient_items']:
+        if forbidden(item['name']):fail('ingredient_items','Název suroviny nesmí obsahovat emoji ani jiné nepodporované znaky.')
+        if item['quantity']:
+            try:
+                quantity=float(item['quantity'].replace(',','.'))
+                if not 0<=quantity<=999:raise ValueError()
+            except ValueError:fail('ingredient_items','Množství surovin musí být číslo od 0 do 999.')
+    if any(not step['text'] or len(step['text'])>1000 for step in recipe['flow']):fail('flow','Každý krok potřebuje popis o délce nejvýše 1000 znaků.')
+    if not any(step['program_key'] or step['action'] in PROGRAMS or step['action']=='custom' for step in recipe['flow']):
+        fail('flow','Autorský recept musí obsahovat alespoň jeden program hrnce.')
+    if not errors:
+        try:payload(cloud,recipe)
+        except ValueError as error:fail('flow',str(error))
+    return errors
 
 
-def publish_author(cloud,recipe,identifier=None):
+def publish_author(cloud,recipe,identifier=None,*,before_create=None):
     """Explicit public submission, matching the app's publication screen."""
+    errors=author_requirements(cloud,recipe)
+    if errors:raise ValueError(' '.join(e['message'] for e in errors))
     match=re.fullmatch(r'data:image/(jpeg|png|webp);base64,([A-Za-z0-9+/=]+)',recipe.get('photo',''))
     if not match:raise ValueError('Pro veřejné zveřejnění přidej vlastní fotografii pokrmu do formuláře receptu.')
     raw=base64.b64decode(match[2],validate=True)
@@ -208,6 +225,7 @@ def publish_author(cloud,recipe,identifier=None):
         for step in value['steps']:step['ingredients']=[value['ingredients'][int(ref[2:])].get('identifier') or ref for ref in step['ingredients']]
         value['identifier']={'functionalId':recipe_reference(identifier),'sourceSystem':'PRO'}
         return request(cloud,'/v3/recipes/PRO/'+urllib.parse.quote(identifier,safe='')+'?format=lite','PUT',value)
+    if before_create:before_create()
     return request(cloud,'/v3/recipes?format=lite&sourceSystemKey=PRO','POST',value)
 
 

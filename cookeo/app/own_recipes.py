@@ -10,7 +10,9 @@ from .recipes import normalize
 def fingerprint(recipe):
     value=normalize({k:v for k,v in recipe.items() if k not in ('id','updated','schema_version')})
     # These fields are local UI metadata, not recipe content sent to the cooker.
-    for key in ('cloud_id','notes','favorite','photo','author','visibility','personal_source_id'):value.pop(key,None)
+    for key in ('cloud_id','notes','favorite','photo','author','visibility','personal_source_id','recipe_kind','source_title','source_author'):value.pop(key,None)
+    # Preserve ownership digests from v3; v4 adds provenance, not cooking data.
+    value['schema_version']=3
     return hashlib.sha256(json.dumps(value,sort_keys=True,ensure_ascii=False).encode()).hexdigest()
 
 
@@ -72,20 +74,24 @@ def verify_content(cloud,recipe,mobile):
                 raise CloudError('The cloud changed a cooker program or parameter.')
 
 
-def save_private(cloud,recipe):
+def save_private(cloud,recipe,*,owned_original=None):
     local_id=recipe['id'];key=binding_key(cloud,local_id);links=cloud.store.get('own_recipe_links',{})
     previous=links.get(key);digest=fingerprint(recipe)
-    if not previous:
-        source=ugc.personal_source(cloud,recipe)
+    if recipe.get('recipe_kind')=='authored' and owned_original is None:
+        raise ValueError('Nový autorský recept odešli přes publikační formulář. Osobní úprava vzniká pouze importem online receptu.')
+    if not previous or not previous.get('reference'):
+        if previous and previous.get('creation_pending'):raise ValueError('Výsledek vytvoření osobní kopie není ověřený; další zápis se neopakuje.')
+        source=owned_original or ugc.personal_source(cloud,recipe)
         original=(source.get('originalRecipe') or {}).get('fid') or source['fid']
         if any(link.get('original_reference')==original['functionalId'] for k,link in links.items() if k!=key and k.startswith(key.split(':',1)[0]+':')):
-            raise ValueError('Pro tento základ už existuje jiný místní osobní recept. Zvol jiný základ, aby se nepřepsala jeho úprava.')
+            raise ValueError('Pro tento originál už existuje osobní úprava v knihovně. Uprav tuto uloženou kopii.')
         ugc.payload(cloud,recipe)  # Validate all steps before recording an attempt.
-        previous={'creation_pending':True,'original_reference':original['functionalId'],'verified':False}
+        previous={**(previous or {}),'creation_pending':True,'original_reference':original['functionalId'],'verified':False,
+                  'link_kind':'authored' if owned_original is not None else 'adaptation'}
         links[key]=previous;cloud.store.set('own_recipe_links',links)
         # Exactly the native app adaptation flow. No author record is created.
         created=ugc.create_personal(cloud,recipe,source);reference=identifier(created)
-        previous={**previous,'creation_pending':False,'reference':reference,'root_reference':None}
+        previous={**previous,'creation_pending':False,'reference':reference,'root_reference':previous.get('root_reference')}
         links[key]=previous;cloud.store.set('own_recipe_links',links)
     if previous.get('creation_pending') or not previous.get('reference'):
         raise ValueError('Výsledek předchozího vytvoření osobní kopie není ověřený. Další kopii automaticky nezakládám.')
@@ -112,66 +118,101 @@ def owned_link(cloud,local_id):
     return cloud.store.get('own_recipe_links',{}).get(binding_key(cloud,local_id))
 
 
+def author_fingerprint(recipe):
+    return hashlib.sha256((fingerprint(recipe)+'|'+recipe.get('photo','')).encode()).hexdigest()
+
+
 def cloud_status(cloud,recipe):
     link=owned_link(cloud,recipe['id'])
-    if not link:return {'uploaded':False,'privacy':None,'current':False}
-    if not link.get('reference'):return {'uploaded':False,'privacy':None,'current':False,'creation_pending':True}
-    root=ugc.read(cloud,link.get('root_reference') or link['reference'])
-    personal=ugc.read(cloud,link['reference'])
+    if not link:return {'uploaded':False,'privacy':None,'current':False,'device_ready':False}
+    root_ref=link.get('root_reference') or link.get('reference')
+    if not root_ref:return {'uploaded':False,'privacy':None,'current':False,'device_ready':False,'creation_pending':True}
+    root=ugc.read(cloud,root_ref)
+    personal=ugc.read(cloud,link['reference']) if link.get('reference') else {}
     privacy=root.get('privacyLevel')
+    if privacy=='COMMUNITY':privacy='PUBLIC'
     if privacy not in ('PRIVATE','PUBLIC'):raise CloudError('Cloud visibility could not be verified.')
-    result={**link,'uploaded':True,'privacy':privacy,
-            'publication_status':root.get('status'),
-            'personal_status':personal.get('status'),
+    ready=bool(link.get('verified') and link.get('fingerprint')==fingerprint(recipe)
+                and personal.get('privacyLevel')=='PRIVATE' and personal.get('status')=='PERSONAL')
+    authored=link.get('link_kind')=='authored' or recipe.get('recipe_kind')=='authored' and bool(link.get('root_reference'))
+    if authored:link={**link,'link_kind':'authored'}
+    result={**link,'uploaded':True,'privacy':privacy,'publication_status':root.get('status'),
+            'personal_status':personal.get('status'),'device_ready':ready,
             'publicly_published':privacy=='PUBLIC' and root.get('status') in ('PUBLISHED','VALIDATED_MARKET'),
-            'current':bool(link.get('verified') and link.get('fingerprint')==fingerprint(recipe)
-                           and personal.get('privacyLevel')=='PRIVATE' and personal.get('status')=='PERSONAL')}
+            'current':link.get('author_fingerprint')==author_fingerprint(recipe) if authored else ready}
     links=cloud.store.get('own_recipe_links',{});links[binding_key(cloud,recipe['id'])]={**link,'privacy':privacy,'publication_status':root.get('status')}
     cloud.store.set('own_recipe_links',links)
     return result
 
 
+def save_authored(cloud,recipe):
+    errors=ugc.author_requirements(cloud,recipe)
+    if errors:raise ValueError(' '.join(error['message'] for error in errors))
+    key=binding_key(cloud,recipe['id']);links=cloud.store.get('own_recipe_links',{});link=links.get(key,{})
+    if link and link.get('link_kind')!='authored':
+        if link.get('root_reference') and not recipe.get('cloud_id') and not recipe.get('personal_source_id'):
+            link={**link,'link_kind':'authored'}  # Legacy owned author binding.
+        else:raise ValueError('Tento záznam je osobní úprava, nikoli samostatný autorský recept.')
+    root=link.get('root_reference');digest=author_fingerprint(recipe)
+    if link.get('root_creation_pending'):raise ValueError('Výsledek odeslání autorského receptu není ověřený; další záznam nezakládám.')
+    if not root or link.get('author_fingerprint')!=digest:
+        # Persist uncertainty before a new POST. A lost reply must not cause a
+        # second public submission on retry. Existing roots are always updated.
+        link={**link,'link_kind':'authored','root_creation_pending':False}
+        links[key]=link;cloud.store.set('own_recipe_links',links)
+        def creating():
+            # Photo upload failure must remain retryable. Only the recipe POST
+            # can create an uncertain new author record.
+            link['root_creation_pending']=True
+            links[key]=link;cloud.store.set('own_recipe_links',links)
+        submitted=ugc.publish_author(cloud,recipe,root,before_create=creating)
+        root=root or identifier(submitted)
+        link={**link,'root_reference':root,'root_creation_pending':False}
+        links[key]=link;cloud.store.set('own_recipe_links',links)
+        observed=ugc.read(cloud,root)
+        if observed.get('privacyLevel') not in ('PUBLIC','COMMUNITY'):raise CloudError('Výrobce nepotvrdil veřejné odeslání autorského receptu.')
+        link.update(author_fingerprint=digest,privacy='PUBLIC',publication_status=observed.get('status'),
+            grouping=recipe_reference((observed.get('groupingId') or observed.get('topRecipeId') or {}).get('functionalId')))
+        links[key]=link;cloud.store.set('own_recipe_links',links)
+    # Device delivery uses a separate private PERSONAL variant of OUR author
+    # root, never an unrelated catalog base. Pending moderation is reported.
+    if ugc.read(cloud,root).get('privacyLevel') not in ('PUBLIC','COMMUNITY'):
+        ugc.visibility(cloud,root,'PUBLIC')
+        if ugc.read(cloud,root).get('privacyLevel') not in ('PUBLIC','COMMUNITY'):raise CloudError('Výrobce nepotvrdil veřejné odeslání autorského receptu.')
+    try:
+        original=cloud.recipe(root)
+        save_private(cloud,recipe,owned_original=original)
+    except (CloudError,ValueError) as error:
+        # Submission and device availability are independent outcomes. Keep the
+        # confirmed author binding even if the private variant is not ready.
+        result=cloud_status(cloud,recipe)
+        return {**result,'device_copy_error':str(error)}
+    return cloud_status(cloud,recipe)
+
+
 def change_visibility(cloud,recipe,visibility):
-    if visibility not in ('PRIVATE','PUBLIC'):raise ValueError('Invalid recipe visibility.')
-    if visibility=='PUBLIC' and not recipe.get('photo','').startswith('data:image/'):
-        raise ValueError('Pro veřejné zveřejnění přidej vlastní fotografii pokrmu do formuláře receptu.')
+    if visibility!='PRIVATE':raise ValueError('Veřejné odeslání potvrď v autorském publikačním formuláři.')
     link=owned_link(cloud,recipe['id'])
     if not link:raise ValueError('Nejdřív ulož recept na cloud.')
+    if recipe.get('recipe_kind')=='adaptation':raise ValueError('Osobní úprava zůstává soukromá; veřejný autorský tok se na ni nepoužívá.')
     root=link.get('root_reference')
-    # Public visibility belongs to the authored recipe. The device's PERSONAL
-    # adaptation remains private, including when its source is published.
-    verify_private(cloud,link['reference'])
-    if visibility=='PUBLIC':
-        submitted=ugc.publish_author(cloud,recipe,root)
-        root=identifier(submitted) if not root else root
-        link={**link,'root_reference':root}
-        links=cloud.store.get('own_recipe_links',{});links[binding_key(cloud,recipe['id'])]=link
-        cloud.store.set('own_recipe_links',links)
-    elif root and ugc.read(cloud,root).get('privacyLevel')!=visibility:
-        ugc.visibility(cloud,root,visibility)
-    observed=ugc.read(cloud,root or link['reference']).get('privacyLevel')
-    if observed!=visibility:raise CloudError('Cloud nepotvrdil změnu viditelnosti receptu.')
-    links=cloud.store.get('own_recipe_links',{});links[binding_key(cloud,recipe['id'])]={**link,'privacy':observed}
-    cloud.store.set('own_recipe_links',links)
+    if not root:raise ValueError('Recept nemá vlastní autorský záznam.')
+    if ugc.read(cloud,root).get('privacyLevel')!='PRIVATE':ugc.visibility(cloud,root,'PRIVATE')
+    if ugc.read(cloud,root).get('privacyLevel')!='PRIVATE':raise CloudError('Cloud nepotvrdil změnu viditelnosti receptu.')
     return cloud_status(cloud,recipe)
 
 
 def save_cloud(cloud,recipe):
-    visibility=recipe.get('visibility','PRIVATE')
-    if visibility=='PUBLIC' and not recipe.get('photo','').startswith('data:image/'):
-        raise ValueError('Pro veřejné zveřejnění přidej vlastní fotografii pokrmu do formuláře receptu.')
-    # Never create or update author sources in the private-save path. A source
-    # marked PRIVATE entered moderation in live use; anonymity checks alone did
-    # not establish that the publication workflow was bypassed.
-    result=save_private(cloud,recipe)
-    if visibility=='PUBLIC':change_visibility(cloud,recipe,visibility)
-    elif result.get('root_reference'):change_visibility(cloud,recipe,'PRIVATE')
+    if recipe.get('recipe_kind')=='authored':
+        raise ValueError('Nový autorský recept odešli přes publikační formulář, nikoli jako soukromou osobní úpravu.')
+    if recipe.get('visibility','PRIVATE')!='PRIVATE':raise ValueError('Importovaná osobní úprava se ukládá soukromě.')
+    save_private(cloud,recipe)
     return cloud_status(cloud,recipe)
 
 
 def sendable(cloud,recipe):
     result=cloud_status(cloud,recipe)
-    if not result['uploaded'] or not result['current']:raise ValueError('Nejdřív ulož aktuální recept na cloud.')
+    if not result['uploaded'] or not result['current'] or not result.get('device_ready',result['current']):raise ValueError('Nejdřív ulož aktuální recept na cloud.')
     verify_private(cloud,result['reference'])
     verify_content(cloud,recipe,cloud.recipe(result['reference']))
     return result
@@ -183,8 +224,10 @@ def delete_cloud(cloud,recipe,*,all_scopes=False):
         raise ValueError('Recept má kopii také pod jiným účtem nebo regionem. Nejdřív ji odstraň v daném profilu.')
     link=links.get(key)
     if not link:return {'deleted':True}
+    if link.get('root_creation_pending') or link.get('creation_pending'):
+        raise ValueError('Výsledek předchozího vytvoření není ověřený. Nejdřív je nutné dohledat cloudový záznam; místní recept a vazba zůstávají zachované.')
     # Only server-side ownership bindings qualify, never an imported cloud_id.
-    refs=list(dict.fromkeys([link['reference'],link.get('root_reference')]))
+    refs=list(dict.fromkeys([link.get('reference'),link.get('root_reference')]))
     for ref in filter(None,refs):
         ugc.delete(cloud,ref)
     links=cloud.store.get('own_recipe_links',{});links.pop(key,None);cloud.store.set('own_recipe_links',links)

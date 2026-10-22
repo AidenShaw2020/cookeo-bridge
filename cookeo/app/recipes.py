@@ -9,7 +9,8 @@ ACTIONS=('manual','prep','add','stir','wait','sear_strong','sear_medium','sear_g
          'bake','air_fry','keep_warm','serve','custom')
 COURSES=('main','starter','soup','side','dessert','breakfast','snack','sauce','drink','other')
 FIELDS={'title','ingredients','steps','notes','favorite','cloud_id','prep_minutes','cook_minutes',
-        'servings','course','ingredient_items','flow','author','photo','visibility','personal_source_id'}
+        'servings','course','ingredient_items','flow','author','photo','visibility','personal_source_id',
+        'recipe_kind','source_title','source_author'}
 
 
 def minutes(value):
@@ -32,13 +33,18 @@ def normalize(value):
     if type(servings) is not int or not 1<=servings<=100:raise ValueError('Servings must be an integer between 1 and 100.')
     course=value.get('course','main')
     if course not in COURSES:raise ValueError('Invalid course.')
-    result.update(servings=servings,course=course,favorite=bool(value.get('favorite',False)),schema_version=3)
+    result.update(servings=servings,course=course,favorite=bool(value.get('favorite',False)),schema_version=4)
     cloud=value.get('cloud_id')
     if cloud is not None and (not isinstance(cloud,str) or len(cloud)>128):raise ValueError('Neplatný cloudový recept.')
     result['cloud_id']=cloud
     source=value.get('personal_source_id')
     if source is not None and (not isinstance(source,str) or len(source)>128):raise ValueError('Invalid personal recipe source.')
     result['personal_source_id']=source
+    kind=value.get('recipe_kind') or ('adaptation' if cloud or source else 'authored')
+    if kind not in ('authored','adaptation'):raise ValueError('Invalid recipe kind.')
+    if kind=='authored' and (cloud or source):raise ValueError('An imported recipe must retain its adaptation origin.')
+    if kind=='adaptation' and not (cloud or source):raise ValueError('An adaptation needs its original recipe reference.')
+    result.update(recipe_kind=kind,source_title=text(value.get('source_title',''),200),source_author=text(value.get('source_author',''),100))
     result['author']=text(value.get('author',''),100)
     visibility=value.get('visibility','PRIVATE')
     if visibility not in ('PRIVATE','PUBLIC'):raise ValueError('Invalid recipe visibility.')
@@ -97,6 +103,6 @@ def normalize(value):
 
 
 def migrate(value):
-    if value.get('schema_version')==3:return value
+    if value.get('schema_version')==4:return value
     normalized=normalize({k:v for k,v in value.items() if k in FIELDS})
     return {**normalized,**{k:value[k] for k in ('id','updated') if k in value}}
