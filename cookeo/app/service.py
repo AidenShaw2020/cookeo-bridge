@@ -6,6 +6,7 @@ import time
 import secrets
 from .models import CookeoStatus,CookeoShadow
 from .programs import program_name
+from .telemetry_labels import PHASES,MODES,telemetry_label
 
 
 @dataclass
@@ -34,6 +35,8 @@ class DeviceState:
         online=self.shadow.connected
         active=phase in ('warming','cooking','keep_warm','depressurization','paused','delayed','ready','done','alert')
         return {'connected':online,'source_connected':self.source_connected,'status':phase,
+                'status_label':telemetry_label(phase,PHASES,language),
+                'mode_label':telemetry_label(current.mode,MODES,language) if active else None,
                 'mode':current.mode if active else None,'program':program_name(current.program.key,current.program.name,language) if active and current.program else None,
                 'program_id':current.display_program_id,'duration':current.display_duration,
                 'recipe':current.display_recipe_title,'step':current.display_recipe_step,

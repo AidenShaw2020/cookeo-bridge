@@ -108,3 +108,7 @@ Keep app data and Home Assistant backups private. OAuth tokens are encrypted in 
 ## License and acknowledgements
 
 MIT; see [LICENSE](LICENSE) and [third-party attribution](NOTICE.md).
+
+### Entity state language
+
+Program, cooking-status and mode values follow the add-on interface language. From 0.4.5, use the `code` attribute of status/mode entities for language-independent automations (for example `cooking` or `manual`). Existing automations comparing raw English entity states may need updating. Raw `status` and `mode` MQTT payload fields stay unchanged. Language changes appear on the next state publication, normally within 30 seconds while connected.

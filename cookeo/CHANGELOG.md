@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.5 — 2026-10-22
+
+- Localize cooking-status and mode entity values using the interface language, matching the program entity. Stable raw MQTT status/mode fields remain unchanged and are also exposed as the entity attribute `code`.
+
 ## 0.4.4 — 2026-10-22
 
 - Keep the cooker illustration in the device card layout so the software/status divider stays below it on desktop and mobile, including when the product caption is hidden.

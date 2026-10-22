@@ -87,3 +87,9 @@ Přijetí příkazu cloudem a potvrzení načtení hrncem jsou dvě různé věc
 Ověřeno na CE9821F0, firmwaru 1.8.3 a My Moulinex BE/nl. Jiné modely a regiony potřebují ověření. Bluetooth proxy HA slouží k vyhledání adresy; samotné nové BLE párování nyní vyžaduje místní Bluetooth adaptér na hostiteli doplňku. Již registrovaný hrnec Bluetooth nepotřebuje.
 
 Licence MIT. Nezávislý komunitní projekt bez spojení s výrobcem; [poděkování a licence převzatých částí](NOTICE.md).
+
+### Jazyk hodnot entit
+
+Program, stav vaření a režim se zobrazují podle jazyka rozhraní doplňku. Například `cooking` → „Probíhá vaření“ a `manual` → „Ruční“. Při změně jazyka se hodnoty obnoví při dalším zveřejnění stavu (nejpozději během přibližně 30 sekund při připojení).
+
+Od verze 0.4.5 používej pro automatizace stavových entit raději jejich atribut `code` (`cooking`, `manual` atd.), aby nezávisely na jazyku. Pokud už automatizace porovnává přímo anglický stav entity, je potřeba ji upravit. Původní pole `status` a `mode` v MQTT zprávě zůstávají stejné.
