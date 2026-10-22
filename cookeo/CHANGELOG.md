@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.3 — 2026-10-22
+
+- Remove the redundant product-code caption from the device dashboard and the specific CMMF code from the public README. Model compatibility checks remain in place.
+
 ## 0.4.2 — 2026-10-22
 
 - Localize all 25 Infinity programs, plus known Touch/classic programs, in live telemetry, recipe steps and the editor using the interface language (English/Czech), independently of account locale.

@@ -99,7 +99,7 @@ For an isolated HA Core + MQTT development environment, see [development](docs/D
 
 ## Status and limitations
 
-Experimental community software. Registration and personal-recipe transfer have been verified with **CE9821F0 / CMMF 7211419888 / firmware 1.8.3**, using My Moulinex BE/nl. Other cookers/markets need verification. Cloud telemetry is shown only when the device supplies it. The app distinguishes cloud acceptance from device confirmation; the cooker may load a recipe without emitting the confirmation event, so check its display.
+Experimental community software. Registration and personal-recipe transfer have been verified with **CE9821F0 / firmware 1.8.3**, using My Moulinex BE/nl. Other cookers/markets need verification. Cloud telemetry is shown only when the device supplies it. The app distinguishes cloud acceptance from device confirmation; the cooker may load a recipe without emitting the confirmation event, so check its display.
 
 An Internet connection and functioning manufacturer services are required for cloud features. This app does not install firmware or add languages to the cooker. Recipe transfer does not start heating. New provisioning supports only the verified CE9821F0 and does not implement a remote GATT pairing path through HA Bluetooth proxies.
 
