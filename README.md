@@ -36,6 +36,8 @@ The cooker continues to use the manufacturer's cloud. No firmware change, DNS re
 4. Start the app and select **Open Web UI**. Sign in on the manufacturer's website using your own account.
 5. Configure MQTT, or let the app discover the installed Mosquitto service. Home Assistant must have its MQTT integration enabled for entities to appear.
 
+For manual sign-in completion, obtain the `gsmoduser://tokens#...` callback **from the manufacturer's return page source** (`Ctrl+U` on a PC, then `Ctrl+F`), including the full part after `#`. Paste it into **Complete browser return → Callback URL**. The normal browser address-bar URL does not work. See [browser sign-in](cookeo/DOCS.md#browser-sign-in); do not share the callback tokens.
+
 **Already registered? Sign in using the same account and the same regional context. Do not start pairing again.** See [migration](cookeo/DOCS.md#move-an-already-paired-cooker-to-home-assistant).
 
 ## Recipe lifecycle and privacy

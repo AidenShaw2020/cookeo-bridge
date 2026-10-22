@@ -19,8 +19,9 @@ User passwords for the manufacturer account are entered on the manufacturer's si
 1. Choose the correct brand, country and account language before signing in.
 2. Open **Sign in with manufacturer** in the web interface and sign in with your existing email/password.
 3. The provider returns a `gsmoduser://tokens#...` callback intended for its mobile apps. If your browser cannot open that protocol, use **Complete browser return** in Cookeo Bridge.
-4. Copy the complete callback from the return page's source or browser console into the masked callback field. A normal `https://account.groupeseb.com/...` page address is not the callback. State and nonce must match the current login attempt.
-5. Never post the callback or its tokens into issues or chat. If the login attempt expires, start a new one.
+4. **For manual completion, obtain the callback from the manufacturer's return page source after signing in.** On a PC, open **View page source** (`Ctrl+U`), then use `Ctrl+F` to find `gsmoduser://tokens#`. Copy the entire link, including everything after `#`, without surrounding quotes.
+5. Paste it into Cookeo Bridge's masked **Callback URL** field and save. The normal `https://account.groupeseb.com/...` address from the browser address bar will not work. State and nonce must match the current login attempt.
+6. Never post the callback or its tokens into issues or chat. If the login attempt expires, start a new one.
 
 The callback capture depends on the manufacturer's login page; platform changes can affect it. HA ingress uses your HA authentication, so the standalone local access key is not needed in HA.
 

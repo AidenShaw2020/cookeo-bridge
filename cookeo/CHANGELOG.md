@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.1 — 2026-10-22
+
+- Clarify manual browser sign-in in the English/Czech UI and guides: retrieve the complete gsmoduser callback from the manufacturer return page source (Ctrl+U, Ctrl+F), not the address bar.
+
 ## 0.4.0 — 2026-10-22
 
 - Distinguish authored recipes and imported personal adaptations in cards, details, editor and version-4 exports. Preserve original title/author/source and prevent relabelling imports as independent authorship.

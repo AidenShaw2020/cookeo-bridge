@@ -36,6 +36,16 @@ mqtt_tls: false
 
 Při přechodu z PC nejdřív zastav starý vývojový proces, pak spusť doplněk. Přihlášení v HA můžeš provést znovu; registrace hrnce tím nezanikne. Místní recepty přenes přes **Moje recepty → Export / Import**. Celé soukromé `.dev-data` ani tokeny nikam na GitHub nekopíruj. Samostatné místní poznámky k online receptům nejsou součástí exportu knihovny.
 
+## Ruční dokončení přihlášení
+
+Odkaz `gsmoduser://tokens#...` získáš **ze zdrojového kódu návratové stránky výrobce po přihlášení**, nikoli z adresního řádku prohlížeče.
+
+1. Na návratové stránce otevři **Zobrazit zdrojový kód stránky** (na PC `Ctrl+U`).
+2. Přes `Ctrl+F` najdi `gsmoduser://tokens#` a zkopíruj celý odkaz včetně části za `#`, bez okolních uvozovek.
+3. V doplňku otevři **Účet a jazyk → Dokončit návrat z prohlížeče**, vlož ho do pole **Návratový odkaz** a ulož.
+
+Běžná `https://account.groupeseb.com/...` adresa nefunguje. Odkaz obsahuje přihlašovací tokeny; nikam ho neposílej.
+
 ## Autorské recepty a osobní úpravy
 
 Knihovna rozlišuje **Autorský recept** vytvořený od nuly a **Osobní úpravu** importovaného online receptu. Označení je na kartě, v detailu i editoru. Import zachovává název a autora originálu i odkaz na něj; upravenou kopii nelze přejmenováním typu vydávat za samostatný autorský recept. Původ se zachovává při úpravách i JSON exportu/importu.

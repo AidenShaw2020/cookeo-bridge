@@ -24,7 +24,7 @@ def discovery(device):
         config={'name':name,'unique_id':node+'_'+key,'device':info,'state_topic':base+'/state',
                 'value_template':'{{ value_json.'+key+' if value_json.'+key+' is not none else none }}',
                 'availability':[{'topic':'cookeo_bridge/availability'},{'topic':base+'/availability'}],
-                'availability_mode':'all','origin':{'name':'Cookeo Bridge','sw_version':'0.4.0'}}
+                'availability_mode':'all','origin':{'name':'Cookeo Bridge','sw_version':'0.4.1'}}
         if unit:config['unit_of_measurement']=unit
         if kind:config['device_class']=kind
         if key in ('firmware','error'):config['entity_category']='diagnostic'
